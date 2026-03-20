@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  body {
+    @apply antialiased;
+  }
+}
+
+/* Custom prose styles for blog */
+.prose h1, .prose h2, .prose h3 {
+  @apply font-serif italic tracking-tight text-zinc-900 dark:text-zinc-100;
+}
+
+.prose p {
+  @apply mb-6 text-zinc-600 dark:text-zinc-400 leading-relaxed;
+}
+
+.prose ul {
+  @apply list-disc list-inside mb-6 space-y-2 text-zinc-600 dark:text-zinc-400;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-zinc-200 dark:border-zinc-800 pl-6 italic text-zinc-500 dark:text-zinc-500 my-8;
+}
+
+.prose code {
+  @apply bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-800 dark:text-zinc-200 font-mono text-sm;
+}
+
+@layer utilities {
+  .animate-marquee {
+    animation: marquee 30s linear infinite;
+  }
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
