@@ -326,10 +326,10 @@ const HorizontalScroll = ({ children }: { children: React.ReactNode }) => {
       )}
       
       <div 
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="flex overflow-x-auto gap-6 pb-8 hide-scrollbar snap-x scroll-smooth"
-      >
+      ref={scrollRef}
+      onScroll={handleScroll}
+      className="flex overflow-x-auto overflow-y-hidden gap-6 pb-8 hide-scrollbar snap-x scroll-smooth"
+    >
         {children}
       </div>
 
@@ -1621,13 +1621,21 @@ export default function App() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-6">
                   {books.map((book, idx) => (
                     <div key={idx} className="group cursor-pointer">
-                      <div className="aspect-[2/3] mb-4 overflow-hidden rounded-lg shadow-lg transition-transform group-hover:-translate-y-2 relative">
-                        <img 
-                          src={book.cover} 
-                          alt={book.title} 
-                          className="h-full w-full object-cover grayscale transition-all duration-500 group-hover:grayscale-0"
-                          referrerPolicy="no-referrer"
-                        />
+                        <div className="aspect-[2/3] mb-4 overflow-hidden rounded-lg shadow-lg transition-transform group-hover:-translate-y-2 relative bg-zinc-100 dark:bg-zinc-800">
+                          <img 
+                            src={book.cover.replace('http://', 'https://')} 
+                            alt={book.title} 
+                            className="h-full w-full object-cover grayscale transition-all duration-500 group-hover:grayscale-0"
+                            referrerPolicy="no-referrer"
+                            loading="lazy"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              if (!target.src.includes('placeholder')) {
+                                target.src = `https://picsum.photos/seed/${book.id}/400/600?blur=2`;
+                              }
+                            }}
+                          />
+                     
                         {book.isReading && (
                           <div className="absolute top-2 right-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg animate-pulse">
                             READING
@@ -1653,7 +1661,21 @@ export default function App() {
                     const Icon = IconMap[game.icon];
                     return (
                       <div key={idx} className="min-w-[140px] sm:min-w-[180px] snap-start group relative cursor-pointer">
-                        <div className="aspect-[3/4] rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 shadow-sm transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-xl group-hover:ring-2 group-hover:ring-zinc-900 dark:group-hover:ring-white">
+                      
+      <div className="aspect-[3/4] rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 shadow-sm transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-xl group-hover:ring-2 group-hover:ring-zinc-900 dark:group-hover:ring-white">
+  <img 
+    src={game.imageUrl.replace('http://', 'https://')} 
+    alt={game.title} 
+    className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105 grayscale group-hover:grayscale-0"
+    referrerPolicy="no-referrer"
+    loading="lazy"
+    onError={(e) => {
+      const target = e.target as HTMLImageElement;
+      if (!target.src.includes('placeholder')) {
+        target.src = `https://picsum.photos/seed/${game.id}/400/600?blur=2`;
+      }
+    }}
+  />
                           <img 
                             src={game.imageUrl} 
                             alt={game.title} 
