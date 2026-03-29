@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useScroll, useSpring, useTransform } from 'motion/react';
 import { 
   Github, 
   Linkedin, 
@@ -42,7 +42,9 @@ import {
   Code2,
   Monitor,
   FileText,
-  ChevronLeft
+  ChevronLeft,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -161,20 +163,20 @@ const Badge = ({ children, variant = "default", className }: { children: React.R
 
 const DataStackVisualizer = () => {
   const steps = [
-    { name: 'Sources', tools: ['SQL Server', 'APIs', 'Logs'], icon: Database },
-    { name: 'Ingestion', tools: ['Airbyte', 'Rabbit-MQ'], icon: Activity },
-    { name: 'Storage', tools: ['Snowflake', 'Delta Lake', 'S3'], icon: Layers },
-    { name: 'Processing', tools: ['PySpark', 'Databricks'], icon: Cpu },
-    { name: 'Visualization', tools: ['Tableau', 'XBI'], icon: BarChart3 },
+    { name: 'Sources', tools: ['Databases', 'APIs', 'File Formats'], icon: Database },
+    { name: 'Ingestion', tools: ['Airbyte', 'Airflow', 'Kafka'], icon: Activity },
+    { name: 'Storage', tools: ['S3', 'Snowflake', 'PostgreSQL'], icon: Layers },
+    { name: 'Processing', tools: ['PySpark', 'Databricks', 'dbt'], icon: Cpu },
+    { name: 'Visualization', tools: ['Tableau', 'PowerBI', 'Looker'], icon: BarChart3 },
   ];
 
   return (
-    <div className="py-12 px-6 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 relative">
+    <div className="py-12 px-6 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden relative">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 relative z-10">
         {steps.map((step, idx) => (
           <React.Fragment key={idx}>
-            <div className="flex flex-col items-center text-center z-10 w-full md:w-auto">
-              <div className="w-16 h-16 bg-white dark:bg-zinc-900 rounded-2xl shadow-lg border border-zinc-100 dark:border-zinc-800 flex items-center justify-center mb-4 text-zinc-900 dark:text-white group hover:scale-110 transition-transform">
+            <div className="flex flex-col items-center text-center z-20 w-full md:w-auto">
+              <div className="w-16 h-16 bg-white dark:bg-zinc-900 rounded-2xl shadow-lg border border-zinc-100 dark:border-zinc-800 flex items-center justify-center mb-4 text-zinc-900 dark:text-white cursor-pointer hover:scale-110 hover:rotate-3 transition-transform duration-300">
                 <step.icon size={28} />
               </div>
               <h4 className="font-medium text-sm mb-2 dark:text-white">{step.name}</h4>
@@ -184,16 +186,22 @@ const DataStackVisualizer = () => {
                 ))}
               </div>
             </div>
+            
             {idx < steps.length - 1 && (
-              <div className="hidden md:block flex-grow h-px bg-zinc-300 dark:bg-zinc-700 relative">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-50 dark:bg-zinc-950 px-2">
+              <div className="hidden md:flex flex-grow relative items-center justify-center min-w-[40px]">
+                <div className="absolute left-0 right-0 h-px bg-zinc-300 dark:bg-zinc-700" />
+                <div className="bg-zinc-50 dark:bg-zinc-950 px-2 relative z-10">
                   <ArrowRight size={14} className="text-zinc-400" />
                 </div>
               </div>
             )}
+            
             {idx < steps.length - 1 && (
-              <div className="md:hidden py-2">
-                <ArrowDown size={20} className="text-zinc-300 dark:text-zinc-700" />
+              <div className="md:hidden py-4 relative flex justify-center w-full">
+                <div className="absolute top-0 bottom-0 w-px bg-zinc-300 dark:bg-zinc-700" />
+                <div className="bg-zinc-50 dark:bg-zinc-950 py-2 relative z-10">
+                  <ArrowDown size={20} className="text-zinc-300 dark:text-zinc-700" />
+                </div>
               </div>
             )}
           </React.Fragment>
@@ -326,10 +334,10 @@ const HorizontalScroll = ({ children }: { children: React.ReactNode }) => {
       )}
       
       <div 
-      ref={scrollRef}
-      onScroll={handleScroll}
-      className="flex overflow-x-auto overflow-y-hidden gap-6 pb-8 hide-scrollbar snap-x scroll-smooth"
-    >
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex overflow-x-auto overflow-y-hidden gap-6 pb-8 hide-scrollbar snap-x scroll-smooth"
+      >
         {children}
       </div>
 
@@ -345,7 +353,126 @@ const HorizontalScroll = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+const Typewriter = ({ text, delay = 0 }: { text: string, delay?: number }) => {
+  const [displayedText, setDisplayedText] = useState('');
+  
+  useEffect(() => {
+    let i = 0;
+    let interval: NodeJS.Timeout;
+    const timer = setTimeout(() => {
+      interval = setInterval(() => {
+        setDisplayedText(text.substring(0, i + 1));
+        i++;
+        if (i >= text.length) clearInterval(interval);
+      }, 50);
+    }, delay);
+    return () => {
+      clearTimeout(timer);
+      if (interval) clearInterval(interval);
+    };
+  }, [text, delay]);
+
+  return <span>{displayedText}<span className="animate-pulse">_</span></span>;
+};
+
+const Magnetic = ({ children }: { children: React.ReactElement }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  const handleMouse = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!ref.current) return;
+    const { clientX, clientY } = e;
+    const { height, width, left, top } = ref.current.getBoundingClientRect();
+    const middleX = clientX - (left + width / 2);
+    const middleY = clientY - (top + height / 2);
+    setPosition({ x: middleX * 0.2, y: middleY * 0.2 });
+  };
+
+  const reset = () => {
+    setPosition({ x: 0, y: 0 });
+  };
+
+  const { x, y } = position;
+  return (
+    <motion.div
+      style={{ position: "relative" }}
+      ref={ref}
+      onMouseMove={handleMouse}
+      onMouseLeave={reset}
+      animate={{ x, y }}
+      transition={{ type: "spring", stiffness: 150, damping: 15, mass: 0.1 }}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+const TiltCard = ({ children, className, onClick }: { children: React.ReactNode, className?: string, onClick?: () => void }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [rotateX, setRotateX] = useState(0);
+  const [rotateY, setRotateY] = useState(0);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const xPct = mouseX / width - 0.5;
+    const yPct = mouseY / height - 0.5;
+    setRotateX(yPct * -15);
+    setRotateY(xPct * 15);
+  };
+
+  const handleMouseLeave = () => {
+    setRotateX(0);
+    setRotateY(0);
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onClick={onClick}
+      animate={{ rotateX, rotateY }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      style={{ perspective: 1000, transformStyle: "preserve-3d" }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+import { forwardRef } from 'react';
+
+const PageTransition = forwardRef<HTMLDivElement, { children: React.ReactNode, className?: string, id: string }>(
+  ({ children, className, id }, ref) => (
+    <motion.div
+      ref={ref}
+      key={id}
+      initial={{ opacity: 0, y: 20, filter: 'blur(8px)' }}
+      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      exit={{ opacity: 0, y: -20, filter: 'blur(8px)' }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  )
+);
+PageTransition.displayName = 'PageTransition';
+
 export default function App() {
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, {
+    stiffness: 100,
+    damping: 30,
+    restDelta: 0.001
+  });
+
   const [activeTab, setActiveTab] = useState<'home' | 'experience' | 'projects' | 'skills' | 'blog' | 'life' | 'contact' | 'admin'>('home');
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
@@ -396,10 +523,11 @@ export default function App() {
       if (res.ok) {
         setIsLoggedIn(true);
       } else {
-        alert('Incorrect password');
+        const errorData = await res.json().catch(() => ({}));
+        alert(errorData.error || 'Server error. Check Vercel logs.');
       }
     } catch (err) {
-      alert('Error verifying password');
+      alert('Network error verifying password');
     }
   };
 
@@ -824,6 +952,10 @@ export default function App() {
   return (
     <HelmetProvider>
       <div className="min-h-screen bg-[#F9F9F8] dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans selection:bg-zinc-900 dark:selection:bg-zinc-100 selection:text-white dark:selection:text-zinc-900 transition-colors duration-300">
+        <motion.div 
+          className="fixed top-0 left-0 right-0 h-1 bg-zinc-900 dark:bg-zinc-100 origin-left z-[100]" 
+          style={{ scaleX }} 
+        />
         <CommandPalette 
           isDarkMode={isDarkMode} 
           setIsDarkMode={setIsDarkMode} 
@@ -922,17 +1054,17 @@ export default function App() {
         <AnimatePresence mode="wait">
           {/* HOME / ABOUT */}
           {activeTab === 'home' && !selectedPost && (
-            <motion.div
+            <PageTransition
               key="home"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              id="home"
               className="grid grid-cols-1 lg:grid-cols-12 gap-12"
             >
               <div className="lg:col-span-7">
                 <h1 className="text-6xl md:text-8xl font-serif italic tracking-tighter mb-6 leading-tight dark:text-white">
                   Data <br />
-                  <span className="text-zinc-400 dark:text-zinc-500">Engineer</span>
+                  <span className="text-zinc-400 dark:text-zinc-500">
+                    <Typewriter text="Engineer" delay={300} />
+                  </span>
                 </h1>
                 <p className="text-xl text-zinc-600 dark:text-zinc-400 leading-relaxed mb-8 max-w-xl">
                   {PERSONAL_INFO.summary}
@@ -944,15 +1076,21 @@ export default function App() {
                     <span>Get in Touch</span>
                   </button>
                   <div className="flex items-center gap-4 px-4">
-                    <a href={PERSONAL_INFO.linkedin} target="_blank" rel="noopener noreferrer" title="LinkedIn" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors">
-                      <Linkedin size={24} />
-                    </a>
-                    <a href={PERSONAL_INFO.github} target="_blank" rel="noopener noreferrer" title="Github" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors">
-                      <Github size={24} />
-                    </a>
-                    <a href={PERSONAL_INFO.behance} target="_blank" rel="noopener noreferrer" title="Behance" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors">
-                      <ExternalLink size={24} />
-                    </a>
+                    <Magnetic>
+                      <a href={PERSONAL_INFO.linkedin} target="_blank" rel="noopener noreferrer" title="LinkedIn" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors block">
+                        <Linkedin size={24} />
+                      </a>
+                    </Magnetic>
+                    <Magnetic>
+                      <a href={PERSONAL_INFO.github} target="_blank" rel="noopener noreferrer" title="Github" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors block">
+                        <Github size={24} />
+                      </a>
+                    </Magnetic>
+                    <Magnetic>
+                      <a href={PERSONAL_INFO.behance} target="_blank" rel="noopener noreferrer" title="Behance" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors block">
+                        <ExternalLink size={24} />
+                      </a>
+                    </Magnetic>
                   </div>
                 </div>
 
@@ -1008,7 +1146,7 @@ export default function App() {
                       <img 
                         src={PERSONAL_INFO.aboutImage} 
                         alt="Utsav Shrestha" 
-                        className="w-full h-auto grayscale transition-all duration-700"
+                        className="w-full h-auto grayscale group-hover:grayscale-0 transition-all duration-700"
                         referrerPolicy="no-referrer"
                       />
                     </div>
@@ -1067,17 +1205,12 @@ export default function App() {
                   ))}
                 </div>
               </div>
-            </motion.div>
+            </PageTransition>
           )}
 
           {/* PROJECTS */}
           {activeTab === 'projects' && (
-            <motion.div
-              key="projects"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
+            <PageTransition key="projects" id="projects">
               <SectionHeader title="Featured Projects" subtitle="Impact & Solutions" />
               
               <div className="flex flex-wrap gap-2 mb-8">
@@ -1099,24 +1232,26 @@ export default function App() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {filteredProjects.map((project, idx) => (
-                  <Card key={idx} className="flex flex-col h-full group cursor-pointer" onClick={() => setSelectedProject(project)}>
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
-                        <Briefcase size={20} className="text-zinc-900 dark:text-zinc-100" />
+                  <TiltCard key={idx} className="h-full" onClick={() => setSelectedProject(project)}>
+                    <Card className="flex flex-col h-full group cursor-pointer">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+                          <Briefcase size={20} className="text-zinc-900 dark:text-zinc-100" />
+                        </div>
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">{project.category}</span>
                       </div>
-                      <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">{project.category}</span>
-                    </div>
-                    <h3 className="text-xl font-medium mb-3 group-hover:text-zinc-600 dark:group-hover:text-zinc-400 transition-colors">{project.title}</h3>
-                    <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed mb-6 flex-grow">
-                      {project.description}
-                    </p>
-                    <div className="flex flex-wrap gap-2 mb-6">
-                      {project.tags.map(tag => <Badge key={tag} variant="outline">{tag}</Badge>)}
-                    </div>
-                    <button className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100 font-medium text-sm border-t border-zinc-100 dark:border-zinc-800 pt-4 w-full">
-                      View Deep-Dive <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                    </button>
-                  </Card>
+                      <h3 className="text-xl font-medium mb-3 group-hover:text-zinc-600 dark:group-hover:text-zinc-400 transition-colors">{project.title}</h3>
+                      <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed mb-6 flex-grow">
+                        {project.description}
+                      </p>
+                      <div className="flex flex-wrap gap-2 mb-6">
+                        {project.tags.map(tag => <Badge key={tag} variant="outline">{tag}</Badge>)}
+                      </div>
+                      <button className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100 font-medium text-sm border-t border-zinc-100 dark:border-zinc-800 pt-4 w-full">
+                        View Deep-Dive <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                      </button>
+                    </Card>
+                  </TiltCard>
                 ))}
               </div>
 
@@ -1238,55 +1373,50 @@ export default function App() {
                   </div>
                 </div>
               )}
-            </motion.div>
+            </PageTransition>
           )}
           {activeTab === 'experience' && (
-            <motion.div
-              key="experience"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
+            <PageTransition key="experience" id="experience">
               <SectionHeader title="Professional Journey" subtitle="Work Experience" />
-              <div className="relative max-w-5xl mx-auto py-8">
-                {/* Central Timeline Line */}
-                <div className="absolute left-6 md:left-1/2 top-0 bottom-0 w-px bg-zinc-200 dark:bg-zinc-800 transform md:-translate-x-1/2" />
+              <div className="relative max-w-4xl mx-auto py-8">
+                {/* Left-aligned Timeline Line */}
+                <div className="absolute left-6 top-0 bottom-0 w-px bg-zinc-200 dark:bg-zinc-800" />
                 
-                <div className="space-y-16">
+                <div className="space-y-12">
                   {EXPERIENCES.map((exp, idx) => {
-                    const isEven = idx % 2 === 0;
                     return (
                       <motion.div 
                         key={idx}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5, delay: idx * 0.1 }}
-                        className="relative flex flex-col md:flex-row items-center justify-between group"
+                        className="relative flex items-start group"
                       >
                         {/* Timeline Dot */}
-                        <div className="absolute left-6 md:left-1/2 w-4 h-4 rounded-full bg-white dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-700 transform -translate-x-1/2 group-hover:border-zinc-900 dark:group-hover:border-zinc-100 group-hover:bg-zinc-900 dark:group-hover:bg-zinc-100 transition-all duration-300 z-10 shadow-[0_0_0_4px_rgba(255,255,255,1)] dark:shadow-[0_0_0_4px_rgba(9,9,11,1)]" />
+                        <div className="absolute left-6 w-4 h-4 rounded-full bg-white dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-700 transform -translate-x-1/2 mt-8 group-hover:border-zinc-900 dark:group-hover:border-zinc-100 group-hover:bg-zinc-900 dark:group-hover:bg-zinc-100 transition-all duration-300 z-10 shadow-[0_0_0_4px_rgba(255,255,255,1)] dark:shadow-[0_0_0_4px_rgba(9,9,11,1)]" />
                         
                         {/* Content Container */}
-                        <div className={clsx(
-                          "w-full md:w-5/12 pl-16 md:pl-0 text-left",
-                          isEven ? "md:pr-12" : "md:order-2 md:pl-12"
-                        )}>
-                          <div className="p-6 bg-white dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800/50 shadow-sm hover:shadow-md transition-all duration-300 group-hover:-translate-y-1 relative overflow-hidden">
+                        <div className="w-full pl-16">
+                          <div className="p-8 bg-white dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800/50 shadow-sm hover:shadow-md transition-all duration-300 group-hover:-translate-y-1 relative overflow-hidden text-left">
                             {/* Subtle background gradient on hover */}
                             <div className="absolute inset-0 bg-gradient-to-br from-zinc-50 to-transparent dark:from-zinc-800/20 dark:to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                             
                             <div className="relative z-10">
-                              <div className="flex items-center gap-2 mb-3 text-zinc-500 dark:text-zinc-400 font-mono text-xs justify-start">
-                                <Calendar size={14} />
-                                <span>{exp.period}</span>
+                              <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-4">
+                                <div>
+                                  <h3 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-1">{exp.role}</h3>
+                                  <p className="text-zinc-500 dark:text-zinc-400 font-serif italic text-lg">{exp.company}</p>
+                                </div>
+                                <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 font-mono text-sm bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 rounded-full w-fit">
+                                  <Calendar size={14} />
+                                  <span>{exp.period}</span>
+                                </div>
                               </div>
-                              <h3 className="text-xl font-semibold text-zinc-900 dark:text-white mb-1">{exp.role}</h3>
-                              <p className="text-zinc-500 dark:text-zinc-400 font-serif italic mb-5">{exp.company}</p>
                               
-                              <ul className="space-y-3 text-sm text-zinc-600 dark:text-zinc-400 text-left">
+                              <ul className="space-y-3 text-base text-zinc-600 dark:text-zinc-400 text-left mt-6">
                                 {exp.description.map((item, i) => (
                                   <li key={i} className="flex gap-3 leading-relaxed flex-row">
-                                    <ChevronRight size={14} className="mt-1 flex-shrink-0 text-zinc-400" />
+                                    <ChevronRight size={16} className="mt-1 flex-shrink-0 text-zinc-400" />
                                     <span>{item}</span>
                                   </li>
                                 ))}
@@ -1294,9 +1424,6 @@ export default function App() {
                             </div>
                           </div>
                         </div>
-                        
-                        {/* Spacer for the other side on desktop */}
-                        <div className="hidden md:block w-5/12" />
                       </motion.div>
                     );
                   })}
@@ -1316,14 +1443,12 @@ export default function App() {
                   ))}
                 </div>
               </div>
-            </motion.div>
+            </PageTransition>
           )}          {/* SKILLS / EXPERTISE */}
           {activeTab === 'skills' && (
-            <motion.div
+            <PageTransition
               key="skills"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              id="skills"
               className="space-y-20"
             >
               <div>
@@ -1435,17 +1560,12 @@ export default function App() {
                   })}
                 </div>
               </div>
-            </motion.div>
+            </PageTransition>
           )}
 
           {/* BLOG */}
           {activeTab === 'blog' && (
-            <motion.div
-              key="blog"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
+            <PageTransition key="blog" id="blog">
               {!selectedPost ? (
                 <>
                   <SectionHeader title="Insights & Research" subtitle="The Data Blog" />
@@ -1580,16 +1700,14 @@ export default function App() {
                   </div>
                 </div>
               )}
-            </motion.div>
+            </PageTransition>
           )}
 
           {/* LIFE SECTION */}
           {activeTab === 'life' && (
-            <motion.div
+            <PageTransition
               key="life"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              id="life"
               className="space-y-24"
             >
               {PHOTOGRAPHY.length > 0 && (
@@ -1621,21 +1739,20 @@ export default function App() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-6">
                   {books.map((book, idx) => (
                     <div key={idx} className="group cursor-pointer">
-                        <div className="aspect-[2/3] mb-4 overflow-hidden rounded-lg shadow-lg transition-transform group-hover:-translate-y-2 relative bg-zinc-100 dark:bg-zinc-800">
-                          <img 
-                            src={book.cover.replace('http://', 'https://')} 
-                            alt={book.title} 
-                            className="h-full w-full object-cover grayscale transition-all duration-500 group-hover:grayscale-0"
-                            referrerPolicy="no-referrer"
-                            loading="lazy"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              if (!target.src.includes('placeholder')) {
-                                target.src = `https://picsum.photos/seed/${book.id}/400/600?blur=2`;
-                              }
-                            }}
-                          />
-                     
+                      <div className="aspect-[2/3] mb-4 overflow-hidden rounded-lg shadow-lg transition-transform group-hover:-translate-y-2 relative bg-zinc-100 dark:bg-zinc-800">
+                        <img 
+                          src={book.cover.replace('http://', 'https://')} 
+                          alt={book.title} 
+                          className="h-full w-full object-cover grayscale transition-all duration-500 group-hover:grayscale-0"
+                          referrerPolicy="no-referrer"
+                          loading="lazy"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            if (!target.src.includes('placeholder')) {
+                              target.src = `https://picsum.photos/seed/${book.id}/400/600?blur=2`;
+                            }
+                          }}
+                        />
                         {book.isReading && (
                           <div className="absolute top-2 right-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg animate-pulse">
                             READING
@@ -1660,27 +1777,20 @@ export default function App() {
                   {games.map((game, idx) => {
                     const Icon = IconMap[game.icon];
                     return (
-                      <div key={idx} className="min-w-[140px] sm:min-w-[180px] snap-start group relative cursor-pointer">
-                      
-      <div className="aspect-[3/4] rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 shadow-sm transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-xl group-hover:ring-2 group-hover:ring-zinc-900 dark:group-hover:ring-white">
-  <img 
-    src={game.imageUrl.replace('http://', 'https://')} 
-    alt={game.title} 
-    className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105 grayscale group-hover:grayscale-0"
-    referrerPolicy="no-referrer"
-    loading="lazy"
-    onError={(e) => {
-      const target = e.target as HTMLImageElement;
-      if (!target.src.includes('placeholder')) {
-        target.src = `https://picsum.photos/seed/${game.id}/400/600?blur=2`;
-      }
-    }}
-  />
+                      <TiltCard key={idx} className="min-w-[140px] sm:min-w-[180px] snap-start group relative cursor-pointer">
+                        <div className="aspect-[3/4] rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 shadow-sm transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-xl group-hover:ring-2 group-hover:ring-zinc-900 dark:group-hover:ring-white">
                           <img 
-                            src={game.imageUrl} 
+                            src={game.imageUrl.replace('http://', 'https://')} 
                             alt={game.title} 
                             className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105 grayscale group-hover:grayscale-0"
                             referrerPolicy="no-referrer"
+                            loading="lazy"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              if (!target.src.includes('placeholder')) {
+                                target.src = `https://picsum.photos/seed/${game.id}/400/600?blur=2`;
+                              }
+                            }}
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
                             <h4 className="text-white font-medium text-sm leading-tight mb-2">{game.title}</h4>
@@ -1699,7 +1809,7 @@ export default function App() {
                         {game.status === 'Playing' && (
                           <div className="absolute -top-2 -right-2 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white dark:border-zinc-950 animate-pulse" />
                         )}
-                      </div>
+                      </TiltCard>
                     );
                   })}
                 </HorizontalScroll>
@@ -1738,17 +1848,12 @@ export default function App() {
                   ))}
                 </div>
               </section>
-            </motion.div>
+            </PageTransition>
           )}
 
           {/* CONTACT */}
           {activeTab === 'contact' && (
-            <motion.div
-              key="contact"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
+            <PageTransition key="contact" id="contact">
               <div className="max-w-4xl mx-auto">
                 <div className="bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl p-8 md:p-12 border border-zinc-100 dark:border-zinc-800 text-center">
                   <h2 className="text-3xl font-serif italic mb-4 dark:text-white">Let's Connect</h2>
@@ -1818,28 +1923,32 @@ export default function App() {
                   </form>
 
                   <div className="flex flex-wrap justify-center items-center gap-4 pt-8 border-t border-zinc-200 dark:border-zinc-800">
-                    <a href={PERSONAL_INFO.linkedin} target="_blank" rel="noopener noreferrer" className="p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-900 dark:hover:border-zinc-100 transition-all">
-                      <Linkedin size={18} />
-                    </a>
-                    <a href={PERSONAL_INFO.github} target="_blank" rel="noopener noreferrer" className="p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-900 dark:hover:border-zinc-100 transition-all">
-                      <Github size={18} />
-                    </a>
-                    <a href={`mailto:${PERSONAL_INFO.email}`} className="p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-900 dark:hover:border-zinc-100 transition-all">
-                      <Mail size={18} />
-                    </a>
+                    <Magnetic>
+                      <a href={PERSONAL_INFO.linkedin} target="_blank" rel="noopener noreferrer" className="p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-900 dark:hover:border-zinc-100 transition-all block">
+                        <Linkedin size={18} />
+                      </a>
+                    </Magnetic>
+                    <Magnetic>
+                      <a href={PERSONAL_INFO.github} target="_blank" rel="noopener noreferrer" className="p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-900 dark:hover:border-zinc-100 transition-all block">
+                        <Github size={18} />
+                      </a>
+                    </Magnetic>
+                    <Magnetic>
+                      <a href={`mailto:${PERSONAL_INFO.email}`} className="p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-900 dark:hover:border-zinc-100 transition-all block">
+                        <Mail size={18} />
+                      </a>
+                    </Magnetic>
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </PageTransition>
           )}
 
           {/* ADMIN */}
           {activeTab === 'admin' && (
-            <motion.div
+            <PageTransition
               key="admin"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              id="admin"
               className="max-w-4xl mx-auto"
             >
               <SectionHeader title="Admin Dashboard" subtitle="Manage Content" />
@@ -2396,7 +2505,7 @@ export default function App() {
                   ) : null}
                 </>
               )}
-            </motion.div>
+            </PageTransition>
           )}
         </AnimatePresence>
       </main>
@@ -2421,15 +2530,21 @@ export default function App() {
             </div>
             
             <div className="flex items-center gap-6">
-              <a href={PERSONAL_INFO.linkedin} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
-                <Linkedin size={20} />
-              </a>
-              <a href={PERSONAL_INFO.github} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
-                <Github size={20} />
-              </a>
-              <a href={`mailto:${PERSONAL_INFO.email}`} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
-                <Mail size={20} />
-              </a>
+              <Magnetic>
+                <a href={PERSONAL_INFO.linkedin} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors block">
+                  <Linkedin size={20} />
+                </a>
+              </Magnetic>
+              <Magnetic>
+                <a href={PERSONAL_INFO.github} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors block">
+                  <Github size={20} />
+                </a>
+              </Magnetic>
+              <Magnetic>
+                <a href={`mailto:${PERSONAL_INFO.email}`} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors block">
+                  <Mail size={20} />
+                </a>
+              </Magnetic>
             </div>
           </div>
         </div>
