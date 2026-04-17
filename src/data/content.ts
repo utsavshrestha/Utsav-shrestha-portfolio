@@ -63,9 +63,9 @@ export const PERSONAL_INFO = {
   linkedin: "https://www.linkedin.com/in/utsav-shrestha-770430141/",
   github: "https://github.com/shresthau96",
   behance: "https://behance.net/utsavshrestha",
-  image: "https://res.cloudinary.com/dgo0gravp/image/upload/v1774710985/IMG_2643_vgyabo.jpg",
+  image: "https://res.cloudinary.com/dgo0gravp/image/upload/v1776400084/EEA3280B-3030-4E85-82C7-F8130110B744_uitp9r.png",
   aboutImage: "https://res.cloudinary.com/dgo0gravp/image/upload/v1772891776/IMG_3606_elpbid.jpg",
-  summary: "A seasoned Senior Data Engineer with over 5 years of experience in designing end-to-end solutions, from robust ETL/ELT pipelines to scalable cloud architectures. Proven track record in optimizing daily operations, lowering infrastructure costs, and identifying new business opportunities through data-driven insights.",
+  summary: "A Senior Data Engineer with over 5 years of experience in designing end-to-end solutions, from robust ETL/ELT pipelines to scalable cloud architectures. Proven track record in optimizing daily operations, lowering infrastructure costs, and identifying new business opportunities through data-driven insights.",
 };
 
 export const EXPERIENCES: Experience[] = [
