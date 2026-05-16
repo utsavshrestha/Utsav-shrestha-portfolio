@@ -1,3 +1,5 @@
+import { claudeSkillsContent } from './blog-claude-skills';
+
 export interface Experience {
   role: string;
   company: string;
@@ -65,7 +67,7 @@ export const PERSONAL_INFO = {
   behance: "https://behance.net/utsavshrestha",
   image: "https://res.cloudinary.com/dgo0gravp/image/upload/v1776400084/EEA3280B-3030-4E85-82C7-F8130110B744_uitp9r.png",
   aboutImage: "https://res.cloudinary.com/dgo0gravp/image/upload/v1772891776/IMG_3606_elpbid.jpg",
-  summary: "A Senior Data Engineer with over 5 years of experience in designing end-to-end solutions, from robust ETL/ELT pipelines to scalable cloud architectures. Proven track record in optimizing daily operations, lowering infrastructure costs, and identifying new business opportunities through data-driven insights.",
+  summary: "A seasoned Senior Data Engineer with over 5 years of experience in designing end-to-end solutions, from robust ETL/ELT pipelines to scalable cloud architectures. Proven track record in optimizing daily operations, lowering infrastructure costs, and identifying new business opportunities through data-driven insights.",
 };
 
 export const EXPERIENCES: Experience[] = [
@@ -205,14 +207,14 @@ export const PROJECTS = [
       problem: "The daily data load for Fonepay was taking over 13 hours, which meant data wasn't ready for business analysts until mid-day. The existing Pentaho-based ETL was struggling with the increasing volume of transaction data.",
       solution: "Migrated the core ETL logic to Apache Spark. Implemented broadcast joins for lookup tables, optimized partitioning based on transaction dates, and used Airflow for robust scheduling and error handling.",
       outcome: "Processing time reduced by 82% (13h -> 2.3h). Cloud infrastructure costs were lowered by 40% due to shorter cluster runtimes.",
-      architecture: `
+      architecture: \`
 graph TD
     A[SQL Server Source] -->|JDBC| B(Spark Cluster)
     B -->|Broadcast Join| C[Merchant Lookup]
     B -->|Partition by Date| D[Parquet Files]
     D -->|External Table| E[(Hive Data Warehouse)]
     E -->|Reporting| F[Tableau]
-      `
+      \`
     }
   },
   {
@@ -226,12 +228,12 @@ graph TD
       problem: "eSewa's legacy data warehouse was reaching its storage and compute limits. Querying historical payment data was becoming extremely slow, affecting business decision-making.",
       solution: "Designed a migration strategy using Spark for data validation and Hive for storage. Implemented a schema evolution strategy to handle legacy data inconsistencies.",
       outcome: "Migrated 5+ years of payment data with 100% accuracy. Query performance for year-over-year reports improved by 5x.",
-      architecture: `
+      architecture: \`
 graph LR
     A[Legacy DB] -->|Spark Migration| B[(Hadoop/Hive)]
     B --> C[Validation Layer]
     C --> D[Production Warehouse]
-      `
+      \`
     }
   },
   {
@@ -245,13 +247,13 @@ graph LR
       problem: "During peak trading hours, NEPSE's database would occasionally lag, causing delays in trade execution. There was no real-time visibility into which specific trading systems were causing the load.",
       solution: "Built a log aggregator using Rabbit-MQ to stream server logs. Developed a real-time monitoring dashboard that alerted the infrastructure team to database locks and slow queries.",
       outcome: "Reduced downtime by 60% during peak hours. Identified and resolved 15+ critical database bottlenecks within the first month of deployment.",
-      architecture: `
+      architecture: \`
 graph LR
     A[Trading Systems] -->|Log Stream| B[Rabbit-MQ]
     B --> C[Log Processor]
     C --> D[Real-time Dashboard]
     C --> E[Alerting System]
-      `
+      \`
     }
   }
 ];
@@ -265,8 +267,8 @@ export const USES: UseItem[] = [
   {
     category: "Hardware",
     items: [
-      { name: "MacBook Pro 14\" (M4 Pro)", description: "My primary workhorse. Handles heavy Spark local clusters and multiple containers with ease." },
-      { name: "Dell UltraSharp 27\" 4K", description: "Dual monitor setup for maximum productivity. One vertical for logs/code, one horizontal for architecture diagrams." },
+      { name: "MacBook Pro 14\\" (M4 Pro)", description: "My primary workhorse. Handles heavy Spark local clusters and multiple containers with ease." },
+      { name: "Dell UltraSharp 27\\" 4K", description: "Dual monitor setup for maximum productivity. One vertical for logs/code, one horizontal for architecture diagrams." },
       { name: "Keychron K2 (Brown Switches)", description: "Tactile feedback without waking up the entire neighborhood." },
       { name: "Logitech MX Master 3S", description: "The horizontal scroll wheel is a lifesaver for wide data tables." }
     ]
@@ -350,4 +352,14 @@ export const GAMES: Game[] = [
   { id: "15", title: "Fortnite", platform: "PC/PS5", status: "Playing", imageUrl: "https://res.cloudinary.com/dgo0gravp/image/upload/v1773478290/76953f62b85db186229e1d74e4b597db90e2d3cbd1fc4841.png_fem3a2.avif", icon: "Activity" },
 ];
 
-export const BLOG_POSTS: BlogPost[] = [];
+export const BLOG_POSTS: BlogPost[] = [
+  {
+    id: "claude-documentation-skills",
+    title: "CLAUDE DOCUMENTATION: SKILLS",
+    date: "May 16, 2026",
+    excerpt: "A complete guide on how to build, deploy, and organize Claude Skills. Teach Claude once and benefit every time by avoiding re-briefing, maintaining consistent quality, and sharing with your entire team.",
+    content: claudeSkillsContent,
+    tags: ["Claude", "AI", "Skills"],
+    imageUrl: "https://images.unsplash.com/photo-1620712948343-0008cc890662?auto=format&fit=crop&q=80&w=1000",
+  }
+];
