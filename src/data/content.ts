@@ -1,5 +1,6 @@
 // @ts-ignore
-import claudeSkillsContent from './blog-claude-skills.md?raw';
+import claudeSkillsContent from './blog-claude-skills';
+
 
 export interface Experience {
   role: string;
