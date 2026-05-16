@@ -196,94 +196,31 @@ export const IMPACT_METRICS = [
 
 export const PROJECTS = [
   {
-    title: "Fonepay Pipeline Optimization",
-    category: "Performance Tuning",
-    description: "Redesigned the ETL architecture for Nepal's largest payment network, reducing daily processing time from 13 hours to 2.3 hours using Apache Spark optimization techniques.",
-    tags: ["Spark", "Airflow", "Hadoop"],
-    link: "#",
-    githubUrl: "https://github.com/shresthau96/fonepay-pipeline",
-    liveUrl: "https://fonepay.com",
+    // ... (keep the rest of the object same)
     deepDive: {
       problem: "The daily data load for Fonepay was taking over 13 hours, which meant data wasn't ready for business analysts until mid-day. The existing Pentaho-based ETL was struggling with the increasing volume of transaction data.",
       solution: "Migrated the core ETL logic to Apache Spark. Implemented broadcast joins for lookup tables, optimized partitioning based on transaction dates, and used Airflow for robust scheduling and error handling.",
       outcome: "Processing time reduced by 82% (13h -> 2.3h). Cloud infrastructure costs were lowered by 40% due to shorter cluster runtimes.",
-      architecture: \`
-graph TD
-    A[SQL Server Source] -->|JDBC| B(Spark Cluster)
-    B -->|Broadcast Join| C[Merchant Lookup]
-    B -->|Partition by Date| D[Parquet Files]
-    D -->|External Table| E[(Hive Data Warehouse)]
-    E -->|Reporting| F[Tableau]
-      \`
+      architecture: "graph TD\n    A[SQL Server Source] -->|JDBC| B(Spark Cluster)\n    B -->|Broadcast Join| C[Merchant Lookup]\n    B -->|Partition by Date| D[Parquet Files]\n    D -->|External Table| E[(Hive Data Warehouse)]\n    E -->|Reporting| F[Tableau]"
     }
   },
   {
-    title: "eSewa Data Migration",
-    category: "Data Warehousing",
-    description: "Led the migration of payment load data from legacy systems to a modern big data stack, ensuring zero data loss and improved query performance for business reporting.",
-    tags: ["Hive", "Spark", "Scala"],
-    link: "#",
-    githubUrl: "https://github.com/shresthau96/esewa-migration",
+    // ... (keep the rest of the object same)
     deepDive: {
       problem: "eSewa's legacy data warehouse was reaching its storage and compute limits. Querying historical payment data was becoming extremely slow, affecting business decision-making.",
       solution: "Designed a migration strategy using Spark for data validation and Hive for storage. Implemented a schema evolution strategy to handle legacy data inconsistencies.",
       outcome: "Migrated 5+ years of payment data with 100% accuracy. Query performance for year-over-year reports improved by 5x.",
-      architecture: \`
-graph LR
-    A[Legacy DB] -->|Spark Migration| B[(Hadoop/Hive)]
-    B --> C[Validation Layer]
-    C --> D[Production Warehouse]
-      \`
+      architecture: "graph LR\n    A[Legacy DB] -->|Spark Migration| B[(Hadoop/Hive)]\n    B --> C[Validation Layer]\n    C --> D[Production Warehouse]"
     }
   },
   {
-    title: "Real-time NEPSE Monitoring",
-    category: "Infrastructure",
-    description: "Implemented a real-time server log monitoring system for the Nepal Stock Exchange (NEPSE) to identify and resolve database issues during peak trading hours.",
-    tags: ["MS SQL", "Rabbit-MQ", "Azure"],
-    link: "#",
-    liveUrl: "https://nepalstock.com.np",
+    // ... (keep the rest of the object same)
     deepDive: {
       problem: "During peak trading hours, NEPSE's database would occasionally lag, causing delays in trade execution. There was no real-time visibility into which specific trading systems were causing the load.",
       solution: "Built a log aggregator using Rabbit-MQ to stream server logs. Developed a real-time monitoring dashboard that alerted the infrastructure team to database locks and slow queries.",
       outcome: "Reduced downtime by 60% during peak hours. Identified and resolved 15+ critical database bottlenecks within the first month of deployment.",
-      architecture: \`
-graph LR
-    A[Trading Systems] -->|Log Stream| B[Rabbit-MQ]
-    B --> C[Log Processor]
-    C --> D[Real-time Dashboard]
-    C --> E[Alerting System]
-      \`
+      architecture: "graph LR\n    A[Trading Systems] -->|Log Stream| B[Rabbit-MQ]\n    B --> C[Log Processor]\n    C --> D[Real-time Dashboard]\n    C --> E[Alerting System]"
     }
-  }
-];
-
-export interface UseItem {
-  category: string;
-  items: { name: string; description: string }[];
-}
-
-export const USES: UseItem[] = [
-  {
-    category: "Hardware",
-    items: [
-      { name: "MacBook Pro 14\\" (M4 Pro)", description: "My primary workhorse. Handles heavy Spark local clusters and multiple containers with ease." },
-      { name: "Dell UltraSharp 27\\" 4K", description: "Dual monitor setup for maximum productivity. One vertical for logs/code, one horizontal for architecture diagrams." },
-      { name: "Keychron K2 (Brown Switches)", description: "Tactile feedback without waking up the entire neighborhood." },
-      { name: "Logitech MX Master 3S", description: "The horizontal scroll wheel is a lifesaver for wide data tables." }
-    ]
-  },
-  {
-    category: "Software & Tools",
-    items: [
-      { name: "IntelliJ IDEA Ultimate", description: "My go-to IDE for Scala and Java development. The database tools are unmatched." },
-      { name: "DataGrip", description: "My dedicated database IDE for complex querying and database management." },
-      { name: "VS Code", description: "For Python scripts, frontend work, and quick markdown editing." },
-      { name: "Warp Terminal", description: "A modern, Rust-based terminal that makes navigating command history a breeze." },
-      { name: "OrbStack", description: "A fast, lightweight alternative to Docker Desktop for running containers and Linux machines." },
-      { name: "DBeaver", description: "Universal database tool. Essential for querying Hive, Postgres, and SQL Server." },
-      { name: "Obsidian", description: "My second brain. Where I draft all my architecture notes and blog posts." }
-    ]
   }
 ];
 
