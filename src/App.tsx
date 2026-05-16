@@ -1600,42 +1600,84 @@ export default function App() {
                   </div>
 
                   {filteredBlogs.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      {filteredBlogs.map(post => (
-                        <div 
-                          key={post.id} 
-                          className="group cursor-pointer"
-                          onClick={() => setSelectedPost(post)}
-                        >
-                          <div className="aspect-[16/9] bg-zinc-200 rounded-xl mb-6 overflow-hidden relative">
-                            <img 
-                              src={post.imageUrl || `https://picsum.photos/seed/${post.id}/800/450`} 
-                              alt={post.title} 
-                              className="object-cover w-full h-full grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-500"
-                              referrerPolicy="no-referrer"
-                            />
-                            <div className="absolute top-4 left-4">
-                              <Badge>{post.tags[0]}</Badge>
-                            </div>
+                    <div className="space-y-16">
+                      {/* Featured Post */}
+                      <div 
+                        key={filteredBlogs[0].id} 
+                        className="group cursor-pointer flex flex-col md:flex-row gap-8 items-center"
+                        onClick={() => setSelectedPost(filteredBlogs[0])}
+                      >
+                        <div className="w-full md:w-1/2 lg:w-3/5 aspect-[16/9] md:aspect-[4/3] lg:aspect-[16/9] bg-zinc-200 rounded-2xl overflow-hidden relative shadow-sm group-hover:shadow-md transition-all">
+                          <img 
+                            src={filteredBlogs[0].imageUrl || `https://picsum.photos/seed/${filteredBlogs[0].id}/800/450`} 
+                            alt={filteredBlogs[0].title} 
+                            className="object-cover w-full h-full grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="absolute top-4 left-4">
+                            <Badge className="bg-white/90 text-zinc-900 border-none backdrop-blur-sm shadow-sm">{filteredBlogs[0].tags[0]}</Badge>
                           </div>
-                          <div className="flex items-center gap-3 text-zinc-400 text-xs font-mono mb-3">
+                        </div>
+                        <div className="w-full md:w-1/2 lg:w-2/5 flex flex-col justify-center">
+                          <div className="flex items-center gap-3 text-zinc-500 dark:text-zinc-400 text-sm font-mono mb-4">
                             <Calendar size={14} />
-                            <span>{post.date}</span>
-                            <span className="w-1 h-1 bg-zinc-300 rounded-full" />
+                            <span>{filteredBlogs[0].date}</span>
+                            <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
                             <Clock size={14} />
-                            <span>{getReadingTime(post.content)} min read</span>
+                            <span>{getReadingTime(filteredBlogs[0].content)} min read</span>
                           </div>
-                          <h3 className="text-2xl font-medium mb-3 group-hover:text-zinc-600 dark:group-hover:text-zinc-400 dark:text-white transition-colors leading-tight">
-                            {post.title}
+                          <h3 className="text-3xl lg:text-4xl font-bold mb-4 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 dark:text-white transition-colors leading-tight text-zinc-900">
+                            {filteredBlogs[0].title}
                           </h3>
-                          <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed mb-4 line-clamp-2">
-                            {post.excerpt}
+                          <p className="text-zinc-500 dark:text-zinc-400 text-base leading-relaxed mb-6 line-clamp-3">
+                            {filteredBlogs[0].excerpt}
                           </p>
-                          <div className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100 font-medium text-sm">
+                          <div className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100 font-semibold text-sm border-b border-zinc-900 dark:border-white pb-1 w-fit">
                             Read Full Article <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                           </div>
                         </div>
-                      ))}
+                      </div>
+
+                      {/* Remaining Posts Grid */}
+                      {filteredBlogs.length > 1 && (
+                        <>
+                          <div className="w-full h-px bg-zinc-200 dark:bg-zinc-800" />
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {filteredBlogs.slice(1).map(post => (
+                              <div 
+                                key={post.id} 
+                                className="group cursor-pointer flex flex-col h-full"
+                                onClick={() => setSelectedPost(post)}
+                              >
+                                <div className="aspect-[16/10] bg-zinc-200 rounded-xl mb-6 overflow-hidden relative shadow-sm group-hover:shadow-md transition-all">
+                                  <img 
+                                    src={post.imageUrl || `https://picsum.photos/seed/${post.id}/800/450`} 
+                                    alt={post.title} 
+                                    className="object-cover w-full h-full grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                  <div className="absolute top-4 left-4">
+                                    <Badge className="bg-white/90 text-zinc-900 border-none backdrop-blur-sm shadow-sm">{post.tags[0]}</Badge>
+                                  </div>
+                                </div>
+                                <div className="flex flex-col flex-grow">
+                                  <div className="flex items-center gap-3 text-zinc-400 text-xs font-mono mb-3">
+                                    <span>{post.date}</span>
+                                    <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
+                                    <span>{getReadingTime(post.content)} min</span>
+                                  </div>
+                                  <h3 className="text-xl font-bold mb-3 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 dark:text-white transition-colors leading-tight text-zinc-900">
+                                    {post.title}
+                                  </h3>
+                                  <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed line-clamp-2 mt-auto mb-4">
+                                    {post.excerpt}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
@@ -1645,48 +1687,74 @@ export default function App() {
                   )}
                 </>
               ) : (
-                <div className="max-w-3xl mx-auto">
+                <div className="max-w-4xl mx-auto pb-24">
                   <button 
                     onClick={() => setSelectedPost(null)}
-                    className="flex items-center gap-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white mb-8 transition-colors"
+                    className="flex items-center gap-2 text-sm font-semibold tracking-wide text-zinc-500 hover:text-zinc-900 dark:hover:text-white mb-12 transition-colors uppercase"
                   >
                     <ArrowRight size={16} className="rotate-180" />
-                    <span>Back to Blog</span>
+                    <span>Back to all posts</span>
                   </button>
                   
-                  <div className="mb-12">
-                    <div className="flex items-center gap-3 text-zinc-400 text-xs font-mono mb-4">
-                      <Calendar size={14} />
-                      <span>{selectedPost.date}</span>
-                      <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
-                      <Clock size={14} />
-                      <span>{getReadingTime(selectedPost.content)} min read</span>
-                      <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
-                      <Tag size={14} />
-                      <div className="flex gap-2">
-                        {selectedPost.tags.map(tag => <span key={tag}>{tag}</span>)}
-                      </div>
+                  <div className="mb-12 md:mb-16">
+                    <div className="flex flex-wrap gap-2 mb-6">
+                      {selectedPost.tags.map(tag => (
+                        <span key={tag} className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-full text-xs font-semibold tracking-wide">
+                          {tag}
+                        </span>
+                      ))}
                     </div>
-                    <h1 className="text-4xl md:text-5xl font-serif italic mb-8 leading-tight dark:text-white">
+
+                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 leading-[1.15] dark:text-white text-zinc-900">
                       {selectedPost.title}
                     </h1>
-                    <div className="aspect-[21/9] bg-zinc-200 dark:bg-zinc-800 rounded-2xl overflow-hidden mb-12">
+
+                    {selectedPost.excerpt && (
+                      <p className="text-xl md:text-2xl text-zinc-500 dark:text-zinc-400 mb-8 leading-relaxed font-light max-w-3xl">
+                        {selectedPost.excerpt}
+                      </p>
+                    )}
+
+                    <div className="flex items-center gap-4 py-6 border-y border-zinc-200 dark:border-zinc-800 mb-10">
+                      <img src={PERSONAL_INFO.image} alt={PERSONAL_INFO.name} className="w-12 h-12 rounded-full object-cover grayscale" />
+                      <div>
+                        <div className="font-semibold text-zinc-900 dark:text-white">{PERSONAL_INFO.name}</div>
+                        <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm font-mono mt-1">
+                          <span>{selectedPost.date}</span>
+                          <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
+                          <span>{getReadingTime(selectedPost.content)} min read</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="aspect-[16/9] sm:aspect-[2/1] bg-zinc-100 dark:bg-zinc-800 rounded-3xl overflow-hidden mb-12 lg:mb-16 shadow-sm border border-zinc-200 dark:border-zinc-800 relative group">
                       <img 
                         src={selectedPost.imageUrl || `https://picsum.photos/seed/${selectedPost.id}/1200/600`} 
                         alt={selectedPost.title} 
-                        className="object-cover w-full h-full grayscale"
+                        className="object-cover w-full h-full grayscale group-hover:grayscale-0 transition-all duration-700"
                         referrerPolicy="no-referrer"
                       />
                     </div>
                   </div>
 
-                  <div className="prose prose-zinc dark:prose-invert max-w-none prose-headings:font-serif prose-headings:italic prose-p:text-zinc-600 dark:prose-p:text-zinc-400 prose-p:leading-relaxed">
+                  <div className="max-w-3xl mx-auto prose prose-lg prose-zinc dark:prose-invert prose-headings:font-bold prose-headings:tracking-tight prose-h1:text-4xl prose-h2:text-3xl prose-h3:text-2xl prose-p:text-zinc-600 dark:prose-p:text-zinc-400 prose-p:leading-relaxed prose-a:text-zinc-900 dark:prose-a:text-white prose-a:underline-offset-4 hover:prose-a:text-zinc-600 dark:hover:prose-a:text-zinc-300 prose-blockquote:border-l-4 prose-blockquote:border-zinc-300 dark:prose-blockquote:border-zinc-700 prose-blockquote:pl-6 prose-blockquote:italic prose-blockquote:text-zinc-500 dark:prose-blockquote:text-zinc-400 prose-code:text-zinc-900 dark:prose-code:text-zinc-100 prose-code:bg-zinc-100 dark:prose-code:bg-zinc-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none prose-img:rounded-2xl prose-img:border prose-img:border-zinc-200 dark:prose-img:border-zinc-800 font-sans">
                     <ReactMarkdown
                       components={{
                         code({ node, inline, className, children, ...props }: any) {
                           const match = /language-(\w+)/.exec(className || '');
                           return !inline && match && match[1] === 'mermaid' ? (
                             <Mermaid chart={String(children).replace(/\n$/, '')} />
+                          ) : !inline && match ? (
+                            <div className="rounded-xl overflow-hidden my-6 border border-zinc-200 dark:border-zinc-800">
+                               <div className="bg-zinc-100 dark:bg-zinc-900 px-4 py-2 text-xs font-mono text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
+                                  <span>{match[1]}</span>
+                               </div>
+                               <pre className="!bg-zinc-50 dark:!bg-zinc-950 !m-0 !p-4 overflow-x-auto text-sm">
+                                <code className={className} {...props}>
+                                  {children}
+                                </code>
+                               </pre>
+                            </div>
                           ) : (
                             <code className={className} {...props}>
                               {children}
