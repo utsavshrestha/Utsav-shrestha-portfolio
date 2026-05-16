@@ -335,3 +335,14 @@ export const GAMES: Game[] = [
   { id: "15", title: "Fortnite", platform: "PC/PS5", status: "Playing", imageUrl: "https://res.cloudinary.com/dgo0gravp/image/upload/v1773478290/76953f62b85db186229e1d74e4b597db90e2d3cbd1fc4841.png_fem3a2.avif", icon: "Activity" },
 ];
 
+export const BLOG_POSTS: BlogPost[] = [
+  {
+    id: "claude-documentation-skills",
+    title: "CLAUDE DOCUMENTATION: SKILLS",
+    date: "May 16, 2026",
+    excerpt: "A complete guide on how to build, deploy, and organize Claude Skills. Teach Claude once and benefit every time by avoiding re-briefing, maintaining consistent quality, and sharing with your entire team.",
+    content: claudeSkillsContent,
+    tags: ["Claude", "AI", "Skills"],
+    imageUrl: "https://images.unsplash.com/photo-1620712948343-0008cc890662?auto=format&fit=crop&q=80&w=1000",
+  }
+];
