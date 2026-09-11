@@ -8,7 +8,6 @@ import {
   Phone, 
   MapPin, 
   ExternalLink, 
-  ArrowUpRight,
   ChevronRight, 
   Database, 
   Code, 
@@ -465,62 +464,6 @@ const PageTransition = forwardRef<HTMLDivElement, { children: React.ReactNode, c
   )
 );
 PageTransition.displayName = 'PageTransition';
-
-const SignalPanel = () => (
-  <div className="signal-panel" aria-label="Illustration of a data platform moving from source to insight">
-    <div className="signal-panel__header">
-      <span className="signal-panel__eyebrow">Live system map</span>
-      <span className="signal-panel__index">01 / 04</span>
-    </div>
-
-    <div className="signal-panel__canvas">
-      <div className="signal-grid" aria-hidden="true" />
-      <svg className="signal-lines" viewBox="0 0 520 360" fill="none" aria-hidden="true">
-        <path d="M90 84C158 84 161 168 230 168" />
-        <path d="M290 168C349 168 354 91 432 91" />
-        <path d="M290 188C354 188 357 274 432 274" />
-        <path d="M90 274C161 274 164 188 230 188" />
-        <circle cx="230" cy="178" r="6" />
-        <circle cx="432" cy="91" r="4" />
-        <circle cx="432" cy="274" r="4" />
-      </svg>
-
-      <motion.div className="signal-node signal-node--source" animate={{ y: [0, -5, 0] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}>
-        <span className="signal-node__icon"><Database size={16} /></span>
-        <span><small>01</small>Sources</span>
-      </motion.div>
-      <motion.div className="signal-node signal-node--storage" animate={{ y: [0, 5, 0] }} transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut', delay: 0.4 }}>
-        <span className="signal-node__icon"><Layers size={16} /></span>
-        <span><small>02</small>Lakehouse</span>
-      </motion.div>
-      <motion.div className="signal-node signal-node--model" animate={{ y: [0, -4, 0] }} transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut', delay: 0.7 }}>
-        <span className="signal-node__icon"><Cpu size={16} /></span>
-        <span><small>03</small>Models</span>
-      </motion.div>
-      <motion.div className="signal-node signal-node--insight" animate={{ y: [0, 5, 0] }} transition={{ duration: 4.8, repeat: Infinity, ease: 'easeInOut', delay: 1 }}>
-        <span className="signal-node__icon"><BarChart3 size={16} /></span>
-        <span><small>04</small>Insight</span>
-      </motion.div>
-
-      <div className="signal-core">
-        <span className="signal-core__pulse" />
-        <span className="signal-core__label">trusted<br />data</span>
-      </div>
-
-      <div className="signal-readout">
-        <span className="signal-readout__dot" />
-        <span>Pipeline healthy</span>
-        <strong>99.98%</strong>
-      </div>
-    </div>
-
-    <div className="signal-panel__footer">
-      <span>Latency budget <strong>2.3h → 14m</strong></span>
-      <span className="signal-panel__footer-line" />
-      <span>Built for decisions</span>
-    </div>
-  </div>
-);
 
 export default function App() {
   const { scrollYProgress } = useScroll();
@@ -1008,9 +951,9 @@ export default function App() {
 
   return (
     <HelmetProvider>
-      <div className="portfolio-shell min-h-screen bg-[#F9F9F8] dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans selection:bg-zinc-900 dark:selection:bg-zinc-100 selection:text-white dark:selection:text-zinc-900 transition-colors duration-300">
+      <div className="min-h-screen bg-[#F9F9F8] dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans selection:bg-zinc-900 dark:selection:bg-zinc-100 selection:text-white dark:selection:text-zinc-900 transition-colors duration-300">
         <motion.div 
-          className="fixed top-0 left-0 right-0 h-1 progress-line origin-left z-[100]"
+          className="fixed top-0 left-0 right-0 h-1 bg-zinc-900 dark:bg-zinc-100 origin-left z-[100]" 
           style={{ scaleX }} 
         />
         <CommandPalette 
@@ -1028,7 +971,7 @@ export default function App() {
           <meta property="og:type" content="website" />
         </Helmet>
         {/* Navigation */}
-        <nav className="site-nav sticky top-0 z-50 bg-[#F9F9F8]/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
+        <nav className="sticky top-0 z-50 bg-[#F9F9F8]/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm">
@@ -1059,7 +1002,6 @@ export default function App() {
                 const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true });
                 window.dispatchEvent(event);
               }}
-              aria-label="Open command palette"
               className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 dark:bg-zinc-800/50 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors"
             >
               <Search size={14} />
@@ -1067,8 +1009,6 @@ export default function App() {
             </button>
             <button 
               onClick={() => setIsDarkMode(!isDarkMode)}
-              aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-              aria-pressed={isDarkMode}
               className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
             >
               {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
@@ -1076,12 +1016,7 @@ export default function App() {
           </div>
 
           {/* Mobile Menu Toggle */}
-          <button
-            className="md:hidden p-2"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            aria-label={isMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
-            aria-expanded={isMenuOpen}
-          >
+          <button className="md:hidden p-2" onClick={() => setIsMenuOpen(!isMenuOpen)}>
             {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
@@ -1105,8 +1040,6 @@ export default function App() {
               <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-2" />
               <button 
                 onClick={() => setIsDarkMode(!isDarkMode)}
-                aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-                aria-pressed={isDarkMode}
                 className="flex items-center gap-3 py-2 font-medium dark:text-white"
               >
                 {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
@@ -1117,97 +1050,161 @@ export default function App() {
         </AnimatePresence>
       </nav>
 
-      <main className="portfolio-main max-w-6xl mx-auto px-6 py-12 md:py-20">
+      <main className="max-w-6xl mx-auto px-6 py-12 md:py-20">
         <AnimatePresence mode="wait">
           {/* HOME / ABOUT */}
           {activeTab === 'home' && !selectedPost && (
-            <PageTransition key="home" id="home" className="home-page">
-              <section className="hero-grid">
-                <div className="hero-copy">
-                  <div className="availability-pill">
-                    <span className="availability-dot" />
-                    <span>Open to staff-level data work</span>
-                    <span className="availability-place">Kathmandu · NPT</span>
-                  </div>
-
-                  <p className="hero-kicker">Senior Data Engineer <span>/</span> Systems builder</p>
-                  <h1 className="hero-title">
-                    Data systems<br />
-                    <em>with a pulse.</em>
-                  </h1>
-                  <p className="hero-lede">
-                    I design reliable pipelines and calm, useful data products for teams that need to move with confidence.
-                  </p>
-
-                  <div className="hero-actions">
-                    <button onClick={() => setActiveTab('projects')} className="action-button action-button--primary">
-                      Explore the work <ArrowRight size={17} />
-                    </button>
-                    <button onClick={() => setActiveTab('contact')} className="action-button action-button--ghost">
-                      Start a conversation <Mail size={17} />
-                    </button>
-                  </div>
-
-                  <div className="hero-meta">
-                    <a href={PERSONAL_INFO.linkedin} target="_blank" rel="noopener noreferrer" className="hero-meta__link">LinkedIn <ExternalLink size={13} /></a>
-                    <a href={PERSONAL_INFO.github} target="_blank" rel="noopener noreferrer" className="hero-meta__link">GitHub <ExternalLink size={13} /></a>
-                    <span className="hero-meta__rule" />
-                    <span className="hero-meta__label">5+ years shaping data</span>
+            <PageTransition
+              key="home"
+              id="home"
+              className="grid grid-cols-1 lg:grid-cols-12 gap-12"
+            >
+              <div className="lg:col-span-7">
+                <h1 className="text-6xl md:text-8xl font-serif italic tracking-tighter mb-6 leading-tight dark:text-white">
+                  Data <br />
+                  <span className="text-zinc-400 dark:text-zinc-500">
+                    <Typewriter text="Engineer" delay={300} />
+                  </span>
+                </h1>
+                <p className="text-xl text-zinc-600 dark:text-zinc-400 leading-relaxed mb-8 max-w-xl">
+                  {PERSONAL_INFO.summary}
+                </p>
+                
+                <div className="flex flex-wrap gap-4 mb-12">
+                  <button onClick={() => setActiveTab('contact')} className="flex items-center gap-2 px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-full hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors">
+                    <Mail size={18} />
+                    <span>Get in Touch</span>
+                  </button>
+                  <div className="flex items-center gap-4 px-4">
+                    <Magnetic>
+                      <a href={PERSONAL_INFO.linkedin} target="_blank" rel="noopener noreferrer" title="LinkedIn" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors block">
+                        <Linkedin size={24} />
+                      </a>
+                    </Magnetic>
+                    <Magnetic>
+                      <a href={PERSONAL_INFO.github} target="_blank" rel="noopener noreferrer" title="Github" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors block">
+                        <Github size={24} />
+                      </a>
+                    </Magnetic>
+                    <Magnetic>
+                      <a href={PERSONAL_INFO.behance} target="_blank" rel="noopener noreferrer" title="Behance" className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors block">
+                        <ExternalLink size={24} />
+                      </a>
+                    </Magnetic>
                   </div>
                 </div>
 
-                <SignalPanel />
-              </section>
-
-              <section className="metric-rail" aria-label="Selected impact metrics">
-                {IMPACT_METRICS.map((metric, idx) => {
-                  const Icon = IconMap[metric.icon];
-                  return (
-                    <div key={idx} className="metric-card">
-                      <div className="metric-card__top">
-                        <span className="metric-card__index">0{idx + 1}</span>
-                        {Icon && <Icon size={16} />}
-                      </div>
-                      <strong>{metric.value}</strong>
-                      <span>{metric.label}</span>
-                    </div>
-                  );
-                })}
-              </section>
-
-              <section className="home-proof">
-                <div className="home-section-heading">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 border-t border-zinc-200 dark:border-zinc-800 pt-12">
                   <div>
-                    <p className="section-overline">Selected systems</p>
-                    <h2>Proof, with the numbers attached.</h2>
+                    <h3 className="font-mono text-xs uppercase tracking-widest text-zinc-400 mb-4">Contact</h3>
+                    <ul className="space-y-3 text-sm">
+                      <li className="flex items-center gap-3 text-zinc-600 dark:text-zinc-400">
+                        <MapPin size={16} className="text-zinc-400" />
+                        {PERSONAL_INFO.location}
+                      </li>
+                      <li className="flex items-center gap-3 text-zinc-600 dark:text-zinc-400">
+                        <Phone size={16} className="text-zinc-400" />
+                        {PERSONAL_INFO.phone}
+                      </li>
+                      <li className="flex items-center gap-3 text-zinc-600 dark:text-zinc-400">
+                        <ExternalLink size={16} className="text-zinc-400" />
+                        <span className="underline underline-offset-4 cursor-pointer">Tableau Portfolio</span>
+                      </li>
+                    </ul>
                   </div>
-                  <button onClick={() => setActiveTab('projects')} className="text-link">View all projects <ArrowRight size={15} /></button>
+                  <div>
+                    <h3 className="font-mono text-xs uppercase tracking-widest text-zinc-400 mb-4">Research Interests</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {RESEARCH_INTERESTS.map(interest => (
+                        <Badge key={interest} variant="outline">{interest}</Badge>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="home-project-grid">
-                  {projects.slice(0, 3).map((project, idx) => (
-                    <button
-                      key={project.id || project.title || idx}
-                      className="home-project-card"
-                      onClick={() => { setSelectedProject(project); setActiveTab('projects'); }}
-                    >
-                      <span className="home-project-card__index">0{idx + 1}</span>
-                      <span className="home-project-card__category">{project.category}</span>
-                      <span className="home-project-card__title">{project.title}</span>
-                      <span className="home-project-card__description">{project.description}</span>
-                      <span className="home-project-card__footer"><span>{project.tags.slice(0, 2).join(' · ')}</span><ArrowUpRight size={16} /></span>
-                    </button>
+                {/* Impact Metrics */}
+                <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {IMPACT_METRICS.map((metric, idx) => {
+                    const Icon = IconMap[metric.icon];
+                    return (
+                      <div key={idx} className="p-4 border border-zinc-100 dark:border-zinc-800 rounded-xl bg-white/50 dark:bg-zinc-900/50">
+                        <div className="text-zinc-400 mb-2">
+                          {Icon && <Icon size={18} />}
+                        </div>
+                        <div className="text-2xl font-bold text-zinc-900 dark:text-white">{metric.value}</div>
+                        <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-mono">{metric.label}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="lg:col-span-5">
+                <div className="flex justify-center mb-10">
+                  <div className="relative bg-[#fdfdfd] dark:bg-[#f0f0f0] p-4 pb-16 sm:p-5 sm:pb-20 shadow-xl rounded-sm transform rotate-2 hover:rotate-0 hover:scale-[1.02] transition-all duration-500 w-full border border-zinc-200 dark:border-zinc-300 group">
+                    <div className="overflow-hidden bg-white border border-zinc-100 dark:border-zinc-300">
+                      <img 
+                        src={PERSONAL_INFO.aboutImage} 
+                        alt="Utsav Shrestha" 
+                        className="w-full h-auto grayscale group-hover:grayscale-0 transition-all duration-700"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <div className="absolute bottom-5 sm:bottom-6 left-0 right-0 text-center font-serif italic text-zinc-500 dark:text-zinc-600 text-lg sm:text-xl opacity-80">
+                      Art & Engineering
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Live Integrations Placeholders */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Card className="p-4 flex flex-col justify-between h-40 relative overflow-hidden group">
+                    <div className="z-10 relative">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Github size={18} className="text-zinc-900 dark:text-white" />
+                        <h3 className="font-medium text-sm dark:text-white">GitHub</h3>
+                      </div>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Live commit history coming soon.</p>
+                      <Badge variant="outline" className="bg-zinc-100 dark:bg-zinc-800 text-[10px]">Setup Pending</Badge>
+                    </div>
+                    <div className="absolute -bottom-4 -right-4 text-zinc-100 dark:text-zinc-800/50 group-hover:scale-110 transition-transform duration-500">
+                      <Github size={80} />
+                    </div>
+                  </Card>
+                  <Card className="p-4 flex flex-col justify-between h-40 relative overflow-hidden group">
+                    <div className="z-10 relative">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Code2 size={18} className="text-zinc-900 dark:text-white" />
+                        <h3 className="font-medium text-sm dark:text-white">LeetCode</h3>
+                      </div>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Live problem stats coming soon.</p>
+                      <Badge variant="outline" className="bg-zinc-100 dark:bg-zinc-800 text-[10px]">Setup Pending</Badge>
+                    </div>
+                    <div className="absolute -bottom-4 -right-4 text-zinc-100 dark:text-zinc-800/50 group-hover:scale-110 transition-transform duration-500">
+                      <Code2 size={80} />
+                    </div>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Tech Stack Marquee */}
+              <div className="lg:col-span-12 mt-12 pt-12 border-t border-zinc-200 dark:border-zinc-800 overflow-hidden relative">
+                <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-[#F9F9F8] dark:from-zinc-950 to-transparent z-10"></div>
+                <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-[#F9F9F8] dark:from-zinc-950 to-transparent z-10"></div>
+                
+                <div className="flex w-max animate-marquee">
+                  {[...Array(2)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-12 px-6">
+                      {["Python", "SQL", "Snowflake", "dbt", "AWS", "Airflow", "Tableau", "React", "TypeScript", "Node.js", "Docker", "Figma", "Adobe CC"].map((tool, idx) => (
+                        <div key={`${i}-${idx}`} className="flex items-center gap-3 text-zinc-400 dark:text-zinc-500 grayscale hover:grayscale-0 hover:text-zinc-900 dark:hover:text-white transition-all duration-300 cursor-default">
+                          <span className="font-mono text-sm uppercase tracking-widest">{tool}</span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-700"></span>
+                        </div>
+                      ))}
+                    </div>
                   ))}
                 </div>
-              </section>
-
-              <section className="focus-strip">
-                <div className="focus-strip__label"><Zap size={16} /> Current focus</div>
-                <div className="focus-strip__items">
-                  {CURRENTLY_LEARNING.slice(0, 4).map(item => <span key={item.name}>{item.name}</span>)}
-                </div>
-                <button onClick={() => setActiveTab('skills')} className="focus-strip__link">See the stack <ArrowRight size={14} /></button>
-              </section>
+              </div>
             </PageTransition>
           )}
 
@@ -2582,7 +2579,7 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="site-footer border-t border-zinc-200 dark:border-zinc-800 py-12 bg-white dark:bg-zinc-950">
+      <footer className="border-t border-zinc-200 dark:border-zinc-800 py-12 bg-white dark:bg-zinc-950">
         <div className="max-w-6xl mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
             <div>
