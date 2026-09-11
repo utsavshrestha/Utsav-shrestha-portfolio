@@ -472,6 +472,8 @@ export default function App() {
     damping: 30,
     restDelta: 0.001
   });
+  const heroImageScale = useTransform(scrollYProgress, [0, 0.32], [1, 1.22]);
+  const heroImageY = useTransform(scrollYProgress, [0, 0.32], [0, -20]);
 
   const [activeTab, setActiveTab] = useState<'home' | 'experience' | 'projects' | 'skills' | 'blog' | 'life' | 'contact' | 'admin'>('home');
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
@@ -1141,17 +1143,19 @@ export default function App() {
 
               <div className="lg:col-span-5">
                 <div className="flex justify-center mb-10">
-                  <div className="relative bg-[#fdfdfd] dark:bg-[#f0f0f0] p-4 pb-16 sm:p-5 sm:pb-20 shadow-xl rounded-sm transform rotate-2 hover:rotate-0 hover:scale-[1.02] transition-all duration-500 w-full border border-zinc-200 dark:border-zinc-300 group">
-                    <div className="overflow-hidden bg-white border border-zinc-100 dark:border-zinc-300">
-                      <img 
+                  <div className="zoom-photo-card group">
+                    <div className="zoom-photo-frame">
+                      <motion.img
                         src={PERSONAL_INFO.aboutImage} 
                         alt="Utsav Shrestha" 
-                        className="w-full h-auto grayscale group-hover:grayscale-0 transition-all duration-700"
+                        style={{ scale: heroImageScale, y: heroImageY }}
+                        className="zoom-photo-image grayscale group-hover:grayscale-0 transition-all duration-700"
                         referrerPolicy="no-referrer"
                       />
                     </div>
-                    <div className="absolute bottom-5 sm:bottom-6 left-0 right-0 text-center font-serif italic text-zinc-500 dark:text-zinc-600 text-lg sm:text-xl opacity-80">
-                      Art & Engineering
+                    <div className="zoom-photo-caption">
+                      <span>Art & Engineering</span>
+                      <span className="zoom-photo-caption__hint"><ArrowDown size={12} /> Scroll through the frame</span>
                     </div>
                   </div>
                 </div>

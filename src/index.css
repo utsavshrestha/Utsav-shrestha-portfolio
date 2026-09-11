@@ -55,3 +55,103 @@
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
+
+/* Minimal depth frame: the image moves inside its fixed paper frame as the page scrolls. */
+.zoom-photo-card {
+  position: relative;
+  width: 100%;
+  padding: .8rem .8rem 3.8rem;
+  background: #fdfdfd;
+  border: 1px solid #deded9;
+  box-shadow: 0 18px 50px rgba(21, 24, 20, .12);
+  transform: rotate(2deg);
+  transition: transform .5s cubic-bezier(.22, 1, .36, 1), box-shadow .5s ease;
+}
+
+.zoom-photo-card:hover {
+  transform: rotate(0deg) translateY(-4px);
+  box-shadow: 0 24px 64px rgba(21, 24, 20, .16);
+}
+
+.dark .zoom-photo-card {
+  background: #f0f0f0;
+  border-color: #d2d2d0;
+}
+
+.zoom-photo-frame {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  background: #e9e8e2;
+  border: 1px solid #d9d9d3;
+}
+
+.zoom-photo-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, .18), transparent 38%, rgba(14, 24, 18, .14));
+  mix-blend-mode: soft-light;
+}
+
+.zoom-photo-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 42%;
+  transform-origin: center 42%;
+  will-change: transform;
+}
+
+.zoom-photo-caption {
+  position: absolute;
+  right: .8rem;
+  bottom: .9rem;
+  left: .8rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .65rem;
+  color: #70756e;
+  font: italic 1.15rem/1 var(--font-serif);
+}
+
+.zoom-photo-caption__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: .28rem;
+  color: #949991;
+  font: 500 .54rem/1 var(--font-mono);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .zoom-photo-card {
+    padding: .65rem .65rem 3.35rem;
+  }
+
+  .zoom-photo-caption {
+    right: .65rem;
+    bottom: .8rem;
+    left: .65rem;
+    font-size: 1rem;
+  }
+
+  .zoom-photo-caption__hint {
+    font-size: .48rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zoom-photo-card {
+    transform: none;
+  }
+
+  .zoom-photo-image {
+    transform: none !important;
+  }
+}
