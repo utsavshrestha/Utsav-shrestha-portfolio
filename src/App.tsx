@@ -299,6 +299,59 @@ const getReadingTime = (text: string) => {
   return Math.ceil(words / wordsPerMinute);
 };
 
+const BLOG_STARTER_TEMPLATE = [
+  '## The idea in one line',
+  '',
+  'Write the clearest version of the idea here. Give the reader a reason to keep going.',
+  '',
+  '## Why this matters',
+  '',
+  'Explain the context in two or three short paragraphs. Keep each paragraph focused on one thought.',
+  '',
+  '> Add one memorable observation, rule, or quote here.',
+  '',
+  '## What I learned',
+  '',
+  '- First useful lesson',
+  '- Second useful lesson',
+  '- A practical next step',
+  '',
+  '## A practical takeaway',
+  '',
+  'Close with the action you want the reader to remember or try.'
+].join('\n');
+
+const BlogMarkdown = ({ content, className }: { content: string; className?: string }) => (
+  <div className={cn('blog-prose', className)}>
+    <ReactMarkdown
+      components={{
+        h1: ({ children, ...props }: any) => <h1 {...props}>{children}</h1>,
+        h2: ({ children, ...props }: any) => <h2 {...props}>{children}</h2>,
+        h3: ({ children, ...props }: any) => <h3 {...props}>{children}</h3>,
+        a: ({ children, href, ...props }: any) => (
+          <a href={href} {...props} target={href?.startsWith('/') ? undefined : '_blank'} rel={href?.startsWith('/') ? undefined : 'noreferrer'}>{children}</a>
+        ),
+        img: ({ alt, ...props }: any) => <img {...props} alt={alt || ''} loading="lazy" />,
+        code({ inline, className: codeClassName, children, ...props }: any) {
+          const match = /language-(\w+)/.exec(codeClassName || '');
+          return !inline && match && match[1] === 'mermaid' ? (
+            <Mermaid chart={String(children).replace(/\n$/, '')} />
+          ) : !inline && match ? (
+            <div className="blog-code-block">
+              <div className="blog-code-label"><span>{match[1]}</span><span>Copy into your notes</span></div>
+              <pre><code className={codeClassName} {...props}>{children}</code></pre>
+            </div>
+          ) : (
+            <code className={codeClassName} {...props}>{children}</code>
+          );
+        }
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  </div>
+);
+
 const HorizontalScroll = ({ children }: { children: React.ReactNode }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLeft, setShowLeft] = useState(false);
@@ -1763,7 +1816,7 @@ export default function App() {
                       ))}
                     </div>
 
-                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 leading-[1.15] dark:text-white text-zinc-900">
+                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif italic font-medium tracking-tight mb-6 leading-[1.05] dark:text-white text-zinc-900">
                       {selectedPost.title}
                     </h1>
 
@@ -1795,35 +1848,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="max-w-3xl mx-auto prose prose-lg prose-zinc dark:prose-invert prose-headings:font-bold prose-headings:tracking-tight prose-h1:text-4xl prose-h2:text-3xl prose-h3:text-2xl prose-p:text-zinc-600 dark:prose-p:text-zinc-400 prose-p:leading-relaxed prose-a:text-zinc-900 dark:prose-a:text-white prose-a:underline-offset-4 hover:prose-a:text-zinc-600 dark:hover:prose-a:text-zinc-300 prose-blockquote:border-l-4 prose-blockquote:border-zinc-300 dark:prose-blockquote:border-zinc-700 prose-blockquote:pl-6 prose-blockquote:italic prose-blockquote:text-zinc-500 dark:prose-blockquote:text-zinc-400 prose-code:text-zinc-900 dark:prose-code:text-zinc-100 prose-code:bg-zinc-100 dark:prose-code:bg-zinc-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none prose-img:rounded-2xl prose-img:border prose-img:border-zinc-200 dark:prose-img:border-zinc-800 font-sans">
-                    <ReactMarkdown
-                      components={{
-                        code({ node, inline, className, children, ...props }: any) {
-                          const match = /language-(\w+)/.exec(className || '');
-                          return !inline && match && match[1] === 'mermaid' ? (
-                            <Mermaid chart={String(children).replace(/\n$/, '')} />
-                          ) : !inline && match ? (
-                            <div className="rounded-xl overflow-hidden my-6 border border-zinc-200 dark:border-zinc-800">
-                               <div className="bg-zinc-100 dark:bg-zinc-900 px-4 py-2 text-xs font-mono text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
-                                  <span>{match[1]}</span>
-                               </div>
-                               <pre className="!bg-zinc-50 dark:!bg-zinc-950 !m-0 !p-4 overflow-x-auto text-sm">
-                                <code className={className} {...props}>
-                                  {children}
-                                </code>
-                               </pre>
-                            </div>
-                          ) : (
-                            <code className={className} {...props}>
-                              {children}
-                            </code>
-                          );
-                        }
-                      }}
-                    >
-                      {selectedPost.content}
-                    </ReactMarkdown>
-                  </div>
+                  <BlogMarkdown content={selectedPost.content} className="max-w-3xl mx-auto" />
 
                   {blogs.filter(post => post.id !== selectedPost.id).slice(0, 3).length > 0 && (
                     <section className="max-w-3xl mx-auto mt-20 pt-10 border-t border-zinc-200 dark:border-zinc-800">
@@ -2255,9 +2280,25 @@ export default function App() {
                               <div className="space-y-2" data-color-mode={isDarkMode ? 'dark' : 'light'}>
                                 <div className="flex items-center justify-between gap-4">
                                   <label className="text-xs font-mono uppercase tracking-widest text-zinc-400">Content</label>
-                                  <span className="text-xs text-zinc-400">Markdown supported · use headings to create rhythm</span>
+                                  <div className="flex items-center gap-3">
+                                    <span className="hidden sm:inline text-xs text-zinc-400">Markdown supported · use headings to create rhythm</span>
+                                    {!editingPostContent.trim() && <button type="button" onClick={() => setEditingPost({...editingPost, content: BLOG_STARTER_TEMPLATE})} className="text-xs font-medium text-zinc-900 dark:text-zinc-100 hover:opacity-60 transition-opacity">Use starter outline</button>}
+                                  </div>
                                 </div>
                                 <MDEditor value={editingPostContent} onChange={(val) => { setEditingPost({...editingPost, content: val || ''}); setBlogSaveState('idle'); }} height={420} className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 focus-within:ring-2 focus-within:ring-zinc-900 dark:focus-within:ring-zinc-100" />
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
+                                  {[
+                                    ['##', 'Section title'],
+                                    ['###', 'Subsection'],
+                                    ['>', 'Callout'],
+                                    ['-', 'List item']
+                                  ].map(([syntax, label]) => (
+                                    <div key={syntax} className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                                      <code className="font-mono text-zinc-900 dark:text-zinc-100">{syntax}</code>
+                                      <span>{label}</span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                               <div className="space-y-2">
                                 <label className="text-xs font-mono uppercase tracking-widest text-zinc-400" htmlFor="blog-tags">Tags</label>
@@ -2293,7 +2334,7 @@ export default function App() {
                                   <div className="flex flex-wrap gap-2 mb-4">{editingPostTags.map(tag => <span key={tag} className="px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-300">{tag}</span>)}</div>
                                   <h1 className="text-3xl font-serif italic text-zinc-900 dark:text-white mb-3">{editingPost.title || 'Untitled dispatch'}</h1>
                                   <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed mb-8">{editingPost.excerpt || 'Add an excerpt to give readers a clear reason to continue.'}</p>
-                                  <div className="prose prose-zinc dark:prose-invert max-w-none prose-headings:font-serif prose-headings:italic prose-p:leading-relaxed"><ReactMarkdown>{editingPostContent || '*Your article preview will appear here.*'}</ReactMarkdown></div>
+                                  <BlogMarkdown content={editingPostContent || '*Your article preview will appear here.*'} />
                                 </div>
                               </div>
                             </div>
