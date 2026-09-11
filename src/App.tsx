@@ -42,6 +42,10 @@ import {
   Code2,
   Monitor,
   FileText,
+  CheckCircle2,
+  Eye,
+  Pencil,
+  ImagePlus,
   ChevronLeft,
   ChevronUp,
   ChevronDown
@@ -490,6 +494,8 @@ export default function App() {
   const [blogCategory, setBlogCategory] = useState('All');
   const [projectCategory, setProjectCategory] = useState('All');
   const [adminSection, setAdminSection] = useState<'blogs' | 'books' | 'games' | 'projects' | 'resume'>('blogs');
+  const [blogEditorMode, setBlogEditorMode] = useState<'write' | 'preview'>('write');
+  const [blogSaveState, setBlogSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const blogCategories = ['All', ...Array.from(new Set(blogs.flatMap(p => p.tags)))];
   const filteredBlogs = blogs.filter(post => {
@@ -554,6 +560,15 @@ export default function App() {
     tags: [],
     imageUrl: ''
   });
+
+  const editingPostContent = editingPost.content || '';
+  const rawEditingPostTags = editingPost.tags as unknown;
+  const editingPostTags = Array.isArray(rawEditingPostTags)
+    ? rawEditingPostTags as string[]
+    : typeof rawEditingPostTags === 'string'
+      ? rawEditingPostTags.split(',').map(tag => tag.trim()).filter(Boolean)
+      : [];
+  const editingPostWordCount = editingPostContent.trim() ? editingPostContent.trim().split(/\s+/).length : 0;
 
   const [editingBook, setEditingBook] = useState<Partial<Book>>({
     title: '',
@@ -667,11 +682,17 @@ export default function App() {
   };
 
   const handleSaveBlog = async () => {
+    if (!editingPost.title?.trim() || !editingPost.content?.trim()) {
+      setBlogSaveState('error');
+      return;
+    }
+
+    setBlogSaveState('saving');
     const postToSave = {
       ...editingPost,
       id: editingPost.id || Date.now().toString(),
       date: editingPost.date || new Date().toISOString().split('T')[0],
-      tags: typeof editingPost.tags === 'string' ? (editingPost.tags as string).split(',').map(t => t.trim()) : editingPost.tags,
+      tags: typeof editingPost.tags === 'string' ? (editingPost.tags as string).split(',').map(t => t.trim()).filter(Boolean) : editingPost.tags,
       imageUrl: editingPost.imageUrl || ''
     };
 
@@ -682,14 +703,15 @@ export default function App() {
         body: JSON.stringify({ password: adminPassword, blog: postToSave })
       });
       if (res.ok) {
-        alert("Blog saved successfully!");
         fetchBlogs();
         setEditingPost({ title: '', excerpt: '', content: '', tags: [], imageUrl: '' });
+        setBlogEditorMode('write');
+        setBlogSaveState('saved');
       } else {
-        alert("Failed to save. Check password.");
+        setBlogSaveState('error');
       }
     } catch (err) {
-      alert("Error saving blog");
+      setBlogSaveState('error');
     }
   };
 
@@ -1603,6 +1625,19 @@ export default function App() {
                     </div>
                   </div>
 
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-10 text-xs font-mono uppercase tracking-widest text-zinc-400">
+                    <span>{filteredBlogs.length} {filteredBlogs.length === 1 ? 'article' : 'articles'}{blogSearch || blogCategory !== 'All' ? ' found' : ''}</span>
+                    {(blogSearch || blogCategory !== 'All') && (
+                      <button
+                        type="button"
+                        onClick={() => { setBlogSearch(''); setBlogCategory('All'); }}
+                        className="text-zinc-900 dark:text-zinc-100 hover:opacity-60 transition-opacity"
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                  </div>
+
                   {filteredBlogs.length > 0 ? (
                     <div className="space-y-16">
                       {/* Featured Post */}
@@ -1623,6 +1658,7 @@ export default function App() {
                           </div>
                         </div>
                         <div className="w-full md:w-1/2 lg:w-2/5 flex flex-col justify-center">
+                          <span className="text-[10px] font-mono uppercase tracking-[0.24em] text-zinc-400 mb-4">Featured insight</span>
                           <div className="flex items-center gap-3 text-zinc-500 dark:text-zinc-400 text-sm font-mono mb-4">
                             <Calendar size={14} />
                             <span>{filteredBlogs[0].date}</span>
@@ -1636,6 +1672,11 @@ export default function App() {
                           <p className="text-zinc-500 dark:text-zinc-400 text-base leading-relaxed mb-6 line-clamp-3">
                             {filteredBlogs[0].excerpt}
                           </p>
+                          <div className="flex flex-wrap gap-2 mb-6">
+                            {filteredBlogs[0].tags.slice(0, 3).map(tag => (
+                              <span key={tag} className="text-xs text-zinc-500 dark:text-zinc-400">#{tag}</span>
+                            ))}
+                          </div>
                           <div className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100 font-semibold text-sm border-b border-zinc-900 dark:border-white pb-1 w-fit">
                             Read Full Article <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                           </div>
@@ -1676,6 +1717,14 @@ export default function App() {
                                   <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed line-clamp-2 mt-auto mb-4">
                                     {post.excerpt}
                                   </p>
+                                  <div className="flex items-center justify-between gap-4 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                                    <span className="flex flex-wrap gap-2">
+                                      {post.tags.slice(0, 2).map(tag => <span key={tag}>#{tag}</span>)}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1 text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
+                                      Read <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -1684,9 +1733,12 @@ export default function App() {
                       )}
                     </div>
                   ) : (
-                    <div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
-                      <h3 className="text-xl font-medium text-zinc-900 dark:text-white mb-2">No posts yet</h3>
-                      <p className="text-zinc-500 dark:text-zinc-400">Check back soon for new articles and insights.</p>
+                    <div className="py-20 px-6 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                      <div className="max-w-md mx-auto text-center">
+                        <span className="text-[10px] font-mono uppercase tracking-[0.24em] text-zinc-400">The notebook is open</span>
+                        <h3 className="text-2xl font-serif italic text-zinc-900 dark:text-white mt-3 mb-3">The first field note is on its way.</h3>
+                        <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed">Research, systems, and lessons from building with data will live here.</p>
+                      </div>
                     </div>
                   )}
                 </>
@@ -1694,6 +1746,7 @@ export default function App() {
                 <div className="max-w-4xl mx-auto pb-24">
                   <button 
                     onClick={() => setSelectedPost(null)}
+                    aria-label="Back to all blog posts"
                     className="flex items-center gap-2 text-sm font-semibold tracking-wide text-zinc-500 hover:text-zinc-900 dark:hover:text-white mb-12 transition-colors uppercase"
                   >
                     <ArrowRight size={16} className="rotate-180" />
@@ -1701,6 +1754,7 @@ export default function App() {
                   </button>
                   
                   <div className="mb-12 md:mb-16">
+                    <span className="block text-[10px] font-mono uppercase tracking-[0.24em] text-zinc-400 mb-6">Field notes · Data, systems, and practice</span>
                     <div className="flex flex-wrap gap-2 mb-6">
                       {selectedPost.tags.map(tag => (
                         <span key={tag} className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-full text-xs font-semibold tracking-wide">
@@ -1734,7 +1788,7 @@ export default function App() {
                     <div className="aspect-[16/9] sm:aspect-[2/1] bg-zinc-100 dark:bg-zinc-800 rounded-3xl overflow-hidden mb-12 lg:mb-16 shadow-sm border border-zinc-200 dark:border-zinc-800 relative group">
                       <img 
                         src={selectedPost.imageUrl || `https://picsum.photos/seed/${selectedPost.id}/1200/600`} 
-                        alt={selectedPost.title} 
+                        alt={`Illustration for ${selectedPost.title}`}
                         className="object-cover w-full h-full grayscale group-hover:grayscale-0 transition-all duration-700"
                         referrerPolicy="no-referrer"
                       />
@@ -1770,6 +1824,40 @@ export default function App() {
                       {selectedPost.content}
                     </ReactMarkdown>
                   </div>
+
+                  {blogs.filter(post => post.id !== selectedPost.id).slice(0, 3).length > 0 && (
+                    <section className="max-w-3xl mx-auto mt-20 pt-10 border-t border-zinc-200 dark:border-zinc-800">
+                      <div className="flex items-end justify-between gap-4 mb-6">
+                        <div>
+                          <span className="text-[10px] font-mono uppercase tracking-[0.24em] text-zinc-400">Keep exploring</span>
+                          <h2 className="text-2xl font-serif italic text-zinc-900 dark:text-white mt-2">More from the notebook</h2>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPost(null)}
+                          className="text-xs font-mono uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                        >
+                          All posts
+                        </button>
+                      </div>
+                      <div className="grid gap-3">
+                        {blogs.filter(post => post.id !== selectedPost.id).slice(0, 3).map(post => (
+                          <button
+                            key={post.id}
+                            type="button"
+                            onClick={() => setSelectedPost(post)}
+                            className="group text-left flex items-center justify-between gap-4 py-4 border-b border-zinc-200 dark:border-zinc-800 hover:border-zinc-900 dark:hover:border-zinc-100 transition-colors"
+                          >
+                            <span>
+                              <span className="block text-xs font-mono text-zinc-400 mb-1">{post.date} · {getReadingTime(post.content)} min read</span>
+                              <span className="block font-medium text-zinc-900 dark:text-white group-hover:translate-x-1 transition-transform">{post.title}</span>
+                            </span>
+                            <ArrowRight size={16} className="shrink-0 text-zinc-400 group-hover:translate-x-1 transition-transform" />
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  )}
                 </div>
               )}
             </PageTransition>
@@ -2079,107 +2167,137 @@ export default function App() {
                   </div>
 
                   {adminSection === 'blogs' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                      <div className="lg:col-span-4 space-y-4">
-                        <h3 className="font-mono text-xs uppercase tracking-widest text-zinc-400 mb-4">Existing Posts</h3>
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                      <aside className="lg:col-span-4 space-y-4">
+                        <div className="flex items-end justify-between gap-4">
+                          <div>
+                            <h3 className="font-mono text-xs uppercase tracking-widest text-zinc-400">Posts</h3>
+                            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Choose a post to edit, or start a fresh dispatch.</p>
+                          </div>
+                          <span className="text-xs font-mono text-zinc-400">{blogs.length}</span>
+                        </div>
                         <div className="space-y-2">
-                          {blogs.map(post => (
-                            <div key={post.id} className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg group">
-                              <span className="text-sm font-medium truncate mr-2 dark:text-zinc-200">{post.title}</span>
-                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => setEditingPost(post)} className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white"><Plus size={16} /></button>
-                                <button onClick={() => handleDeleteBlog(post.id)} className="p-1.5 text-zinc-400 hover:text-red-600"><Trash2 size={16} /></button>
+                          {blogs.length > 0 ? blogs.map(post => (
+                            <div key={post.id} className={cn("flex items-center gap-2 p-3 bg-white dark:bg-zinc-900 border rounded-xl group transition-colors", editingPost.id === post.id ? "border-zinc-900 dark:border-zinc-100" : "border-zinc-200 dark:border-zinc-800")}>
+                              <button
+                                type="button"
+                                onClick={() => { setEditingPost(post); setBlogEditorMode('write'); setBlogSaveState('idle'); }}
+                                className="min-w-0 flex-1 text-left"
+                              >
+                                <span className="block text-sm font-medium truncate dark:text-zinc-200">{post.title}</span>
+                                <span className="block text-[10px] font-mono text-zinc-400 mt-1">{post.date} · {getReadingTime(post.content)} min read</span>
+                              </button>
+                              <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                                <button type="button" aria-label={`Edit ${post.title}`} onClick={() => { setEditingPost(post); setBlogEditorMode('write'); setBlogSaveState('idle'); }} className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white"><Pencil size={15} /></button>
+                                <button type="button" aria-label={`Delete ${post.title}`} onClick={() => handleDeleteBlog(post.id)} className="p-1.5 text-zinc-400 hover:text-red-600"><Trash2 size={15} /></button>
                               </div>
                             </div>
-                          ))}
-                          <button 
-                            onClick={() => setEditingPost({ title: '', excerpt: '', content: '', tags: [], imageUrl: '' })}
-                            className="w-full py-3 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-400 hover:border-zinc-900 dark:hover:border-zinc-100 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all flex items-center justify-center gap-2"
+                          )) : (
+                            <div className="p-4 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 text-sm text-zinc-500 dark:text-zinc-400">Your published posts will appear here.</div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => { setEditingPost({ title: '', excerpt: '', content: '', tags: [], imageUrl: '' }); setBlogEditorMode('write'); setBlogSaveState('idle'); }}
+                            className="w-full py-3 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-500 hover:border-zinc-900 dark:hover:border-zinc-100 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all flex items-center justify-center gap-2"
                           >
-                            <Plus size={18} /> New Post
+                            <Plus size={18} /> New post
                           </button>
-                          <button 
+                          <button
+                            type="button"
                             onClick={handleResetBlogs}
                             className="w-full py-2 text-[10px] uppercase tracking-widest text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
                           >
                             Reset to Defaults
                           </button>
                         </div>
-                      </div>
+                      </aside>
 
                       <div className="lg:col-span-8">
-                        <Card className="space-y-6">
-                          <div className="space-y-2">
-                            <label className="text-xs font-mono uppercase tracking-widest text-zinc-400">Title</label>
-                            <input 
-                              type="text" 
-                              className="w-full px-4 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
-                              value={editingPost.title || ''}
-                              onChange={(e) => setEditingPost({...editingPost, title: e.target.value})}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-xs font-mono uppercase tracking-widest text-zinc-400">Excerpt</label>
-                            <textarea 
-                              className="w-full px-4 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 h-20"
-                              value={editingPost.excerpt || ''}
-                              onChange={(e) => setEditingPost({...editingPost, excerpt: e.target.value})}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-xs font-mono uppercase tracking-widest text-zinc-400">Hero Image (Optional)</label>
-                            <div className="flex gap-2">
-                              <input 
-                                type="text" 
-                                placeholder="URL or upload file ->"
-                                className="flex-1 px-4 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
-                                value={editingPost.imageUrl || ''}
-                                onChange={(e) => setEditingPost({...editingPost, imageUrl: e.target.value})}
-                              />
-                              <input 
-                                type="file" 
-                                accept="image/*"
-                                className="hidden" 
-                                id="blog-image-upload"
-                                onChange={async (e) => {
-                                  if (e.target.files && e.target.files[0]) {
-                                    const url = await handleFileUpload(e.target.files[0]);
-                                    if (url) setEditingPost({...editingPost, imageUrl: url});
-                                  }
-                                }}
-                              />
-                              <label 
-                                htmlFor="blog-image-upload"
-                                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-lg cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center"
-                              >
-                                Upload
-                              </label>
+                        <Card className="overflow-hidden p-0">
+                          <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-5 border-b border-zinc-200 dark:border-zinc-800">
+                            <div>
+                              <span className="text-[10px] font-mono uppercase tracking-[0.24em] text-zinc-400">{editingPost.id ? 'Editing post' : 'New post'}</span>
+                              <h3 className="text-2xl font-serif italic text-zinc-900 dark:text-white mt-1">{editingPost.title || 'Untitled dispatch'}</h3>
+                              <div className="flex items-center gap-3 text-xs font-mono text-zinc-400 mt-2">
+                                <span>{editingPostWordCount} words</span>
+                                <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
+                                <span>{editingPostContent ? getReadingTime(editingPostContent) : 0} min read</span>
+                              </div>
+                            </div>
+                            <div className="flex rounded-lg border border-zinc-200 dark:border-zinc-800 p-1 bg-zinc-50 dark:bg-zinc-950">
+                              <button type="button" onClick={() => setBlogEditorMode('write')} className={cn("flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors", blogEditorMode === 'write' ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm" : "text-zinc-400")}><Pencil size={14} /> Write</button>
+                              <button type="button" onClick={() => setBlogEditorMode('preview')} className={cn("flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors", blogEditorMode === 'preview' ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm" : "text-zinc-400")}><Eye size={14} /> Preview</button>
                             </div>
                           </div>
-                          <div className="space-y-2" data-color-mode={isDarkMode ? 'dark' : 'light'}>
-                            <label className="text-xs font-mono uppercase tracking-widest text-zinc-400">Content (Markdown)</label>
-                            <MDEditor
-                              value={editingPost.content || ''}
-                              onChange={(val) => setEditingPost({...editingPost, content: val || ''})}
-                              height={400}
-                              className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 focus-within:ring-2 focus-within:ring-zinc-900 dark:focus-within:ring-zinc-100"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-xs font-mono uppercase tracking-widest text-zinc-400">Tags (comma separated)</label>
-                            <input 
-                              type="text" 
-                              className="w-full px-4 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
-                              value={Array.isArray(editingPost.tags) ? editingPost.tags.join(', ') : (editingPost.tags || '')}
-                              onChange={(e) => setEditingPost({...editingPost, tags: e.target.value as any})}
-                            />
-                          </div>
-                          <button 
-                            onClick={handleSaveBlog}
-                            className="w-full py-4 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2"
-                          >
-                            <Save size={18} /> Save Blog Post
-                          </button>
+
+                          {blogEditorMode === 'write' ? (
+                            <div className="p-6 space-y-6">
+                              <div className="space-y-2">
+                                <label className="text-xs font-mono uppercase tracking-widest text-zinc-400" htmlFor="blog-title">Title</label>
+                                <input id="blog-title" type="text" placeholder="A clear, specific headline" className="w-full px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100" value={editingPost.title || ''} onChange={(e) => { setEditingPost({...editingPost, title: e.target.value}); setBlogSaveState('idle'); }} />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-xs font-mono uppercase tracking-widest text-zinc-400" htmlFor="blog-excerpt">Excerpt</label>
+                                <textarea id="blog-excerpt" placeholder="One or two sentences that tell readers why this matters." className="w-full px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 min-h-24 resize-y" value={editingPost.excerpt || ''} onChange={(e) => setEditingPost({...editingPost, excerpt: e.target.value})} />
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-4">
+                                  <label className="text-xs font-mono uppercase tracking-widest text-zinc-400" htmlFor="blog-image-url">Hero image</label>
+                                  <span className="text-xs text-zinc-400">Optional · landscape works best</span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <input id="blog-image-url" type="text" placeholder="Paste an image URL" className="flex-1 px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100" value={editingPost.imageUrl || ''} onChange={(e) => setEditingPost({...editingPost, imageUrl: e.target.value})} />
+                                  <input type="file" accept="image/*" className="hidden" id="blog-image-upload" onChange={async (e) => { if (e.target.files?.[0]) { const url = await handleFileUpload(e.target.files[0]); if (url) setEditingPost({...editingPost, imageUrl: url}); } }} />
+                                  <label htmlFor="blog-image-upload" className="px-4 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-lg cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2"><ImagePlus size={16} /> Upload</label>
+                                </div>
+                                {editingPost.imageUrl && <img src={editingPost.imageUrl} alt="Blog hero preview" className="w-full h-32 object-cover rounded-lg border border-zinc-200 dark:border-zinc-800 mt-3" referrerPolicy="no-referrer" />}
+                              </div>
+                              <div className="space-y-2" data-color-mode={isDarkMode ? 'dark' : 'light'}>
+                                <div className="flex items-center justify-between gap-4">
+                                  <label className="text-xs font-mono uppercase tracking-widest text-zinc-400">Content</label>
+                                  <span className="text-xs text-zinc-400">Markdown supported · use headings to create rhythm</span>
+                                </div>
+                                <MDEditor value={editingPostContent} onChange={(val) => { setEditingPost({...editingPost, content: val || ''}); setBlogSaveState('idle'); }} height={420} className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 focus-within:ring-2 focus-within:ring-zinc-900 dark:focus-within:ring-zinc-100" />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-xs font-mono uppercase tracking-widest text-zinc-400" htmlFor="blog-tags">Tags</label>
+                                <input id="blog-tags" type="text" placeholder="data engineering, systems, career" className="w-full px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100" value={editingPostTags.join(', ')} onChange={(e) => setEditingPost({...editingPost, tags: e.target.value as any})} />
+                                <p className="text-xs text-zinc-400">Separate tags with commas. They become filters on the public blog.</p>
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                                {[
+                                  ['Title', Boolean(editingPost.title?.trim())],
+                                  ['Excerpt', Boolean(editingPost.excerpt?.trim())],
+                                  ['Content', Boolean(editingPostContent.trim())],
+                                  ['Tags', editingPostTags.length > 0]
+                                ].map(([label, complete]) => (
+                                  <div key={String(label)} className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                                    <CheckCircle2 size={14} className={complete ? 'text-emerald-600' : 'text-zinc-300 dark:text-zinc-700'} />
+                                    <span>{String(label)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div aria-live="polite" className="text-sm">
+                                  {blogSaveState === 'error' && <span className="text-red-600">Add a title and some content before saving.</span>}
+                                  {blogSaveState === 'saved' && <span className="text-emerald-700 dark:text-emerald-400">Saved. Your post is live in the blog list.</span>}
+                                </div>
+                                <button type="button" onClick={handleSaveBlog} disabled={blogSaveState === 'saving'} className="px-5 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"><Save size={18} /> {blogSaveState === 'saving' ? 'Saving…' : editingPost.id ? 'Update post' : 'Save post'}</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-6">
+                              <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                                {editingPost.imageUrl && <img src={editingPost.imageUrl} alt="Blog hero preview" className="w-full aspect-[16/7] object-cover" referrerPolicy="no-referrer" />}
+                                <div className="p-6 sm:p-8">
+                                  <div className="flex flex-wrap gap-2 mb-4">{editingPostTags.map(tag => <span key={tag} className="px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-300">{tag}</span>)}</div>
+                                  <h1 className="text-3xl font-serif italic text-zinc-900 dark:text-white mb-3">{editingPost.title || 'Untitled dispatch'}</h1>
+                                  <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed mb-8">{editingPost.excerpt || 'Add an excerpt to give readers a clear reason to continue.'}</p>
+                                  <div className="prose prose-zinc dark:prose-invert max-w-none prose-headings:font-serif prose-headings:italic prose-p:leading-relaxed"><ReactMarkdown>{editingPostContent || '*Your article preview will appear here.*'}</ReactMarkdown></div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </Card>
                       </div>
                     </div>
