@@ -334,4 +334,55 @@ export const GAMES: Game[] = [
   { id: "15", title: "Fortnite", platform: "PC/PS5", status: "Playing", imageUrl: "https://res.cloudinary.com/dgo0gravp/image/upload/v1773478290/76953f62b85db186229e1d74e4b597db90e2d3cbd1fc4841.png_fem3a2.avif", icon: "Activity" },
 ];
 
-export const BLOG_POSTS: BlogPost[] = [];
+export const BLOG_POSTS: BlogPost[] = [
+  {
+    id: "ai-skills-operating-system",
+    title: "The AI Skills Stack I’m Building to Compound My Work",
+    date: "2026-09-11",
+    excerpt: "AI fluency is becoming less about clever prompts and more about building a reliable loop for thinking, creating, checking, and learning.",
+    tags: ["AI Skills", "Systems", "Learning", "Career"],
+    content: `## The real skill is designing a loop
+
+AI tools change quickly. A prompt that works today may be ordinary next month, so collecting tricks is not enough. The durable advantage is learning how to turn a vague goal into a clear brief, a useful output, and a repeatable improvement loop.
+
+That is the AI skill I am building: **the ability to direct intelligent tools with context, judgment, and evidence.**
+
+## The stack I am building
+
+### 1. Context before commands
+
+Good results start before the prompt. I first define the outcome, the audience, the constraints, and what a good result should look like. This gives the tool something more useful than a short instruction: it gives it a job.
+
+### 2. Decomposition before generation
+
+Large requests become easier when they are split into small decisions. I separate research, planning, creation, review, and delivery. Each step has a visible output, which makes it easier to find where the work needs improvement.
+
+### 3. Verification before trust
+
+A polished answer is not automatically a correct answer. I check important claims, test working outputs, and keep assumptions visible. The goal is not to slow down; it is to make speed dependable.
+
+> The best AI workflow is not the one that produces the most text. It is the one that produces the most useful decisions per hour.
+
+### 4. Memory that improves the next attempt
+
+Every project should leave behind a small record of what worked, what failed, and what to try next. That turns one-off assistance into a system that becomes more useful over time.
+
+## How I practice
+
+I am using a simple weekly loop:
+
+- Choose one real outcome instead of studying tools in isolation.
+- Build the smallest useful version.
+- Review the result against a clear quality bar.
+- Record one reusable lesson.
+- Apply that lesson to the next piece of work.
+
+This approach keeps learning connected to real work. It also makes progress easier to see because the evidence is attached to an outcome: a better article, a cleaner workflow, a faster analysis, or a more reliable product.
+
+## The rule I want to keep
+
+AI should increase the quality of my thinking, not replace it. I want to become better at asking precise questions, noticing weak assumptions, and turning useful answers into action.
+
+That is the direction for this notebook: practical AI skills, tested in real projects, with the lessons kept clear enough to reuse.`
+  }
+];
