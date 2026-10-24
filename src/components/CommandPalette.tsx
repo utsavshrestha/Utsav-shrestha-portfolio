@@ -73,6 +73,7 @@ export function CommandPalette({
     { id: 'nav-contact', title: 'Go to Contact', icon: <Mail size={18} />, section: 'Navigation', onSelect: () => { setActiveTab('contact'); setSelectedPost(null); } },
     
     { id: 'action-theme', title: `Toggle ${isDarkMode ? 'Light' : 'Dark'} Mode`, icon: isDarkMode ? <Sun size={18} /> : <Moon size={18} />, section: 'Actions', onSelect: () => setIsDarkMode(!isDarkMode) },
+    { id: 'action-admin', title: 'Open Admin Dashboard (Manage Blogs & Content)', icon: <Lock size={18} />, section: 'Actions', onSelect: () => { setActiveTab('admin'); setSelectedPost(null); } },
     { id: 'action-resume', title: 'Download Resume', icon: <Download size={18} />, section: 'Actions', onSelect: () => {
       // Find the hidden or visible download link and click it
       const link = document.getElementById('resume-download-link');

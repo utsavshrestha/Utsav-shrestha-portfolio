@@ -341,6 +341,7 @@ export const BLOG_POSTS: BlogPost[] = [
     date: "2026-09-11",
     excerpt: "AI fluency is becoming less about clever prompts and more about building a reliable loop for thinking, creating, checking, and learning.",
     tags: ["AI Skills", "Systems", "Learning", "Career"],
+    imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop",
     content: `## The real skill is designing a loop
 
 AI tools change quickly. A prompt that works today may be ordinary next month, so collecting tricks is not enough. The durable advantage is learning how to turn a vague goal into a clear brief, a useful output, and a repeatable improvement loop.
@@ -384,5 +385,103 @@ This approach keeps learning connected to real work. It also makes progress easi
 AI should increase the quality of my thinking, not replace it. I want to become better at asking precise questions, noticing weak assumptions, and turning useful answers into action.
 
 That is the direction for this notebook: practical AI skills, tested in real projects, with the lessons kept clear enough to reuse.`
+  },
+  {
+    id: "apache-parquet-complete-guide",
+    title: "Apache Parquet: The Complete Columnar Storage Guide",
+    date: "2026-08-24",
+    excerpt: "Everything you need to know — from what a columnar file format is, all the way to how row groups, predicate pushdown, and encodings power modern data lakes.",
+    tags: ["Data Engineering", "Big Data", "Parquet", "Architecture"],
+    imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?q=80&w=1600&auto=format&fit=crop",
+    content: `## What Is a Parquet File?
+
+Before we talk about Parquet specifically, let's understand what a file format is — because that's the foundation everything else builds on.
+
+Apache Parquet is an open-source, columnar storage file format designed specifically for storing large amounts of tabular data (database tables, analytics datasets, and event logs) as efficiently as possible.
+
+> Imagine you have a library with 1 million books. A row-based format (like CSV) keeps each book as one complete unit on a shelf. A columnar format (like Parquet) keeps one giant list of all titles in one room, all authors in another, and all publication years in another. If you only need to analyze publication years, you only walk into one room.
+
+## Storage Model: Row-Based vs. Columnar
+
+When querying analytical workloads, you rarely need every single column of a 150-column table. Columnar storage lays values of the same column contiguously on disk:
+
+- **Column Pruning:** Read only the columns referenced in your query and skip everything else.
+- **Predicate Pushdown:** Query engines inspect min/max statistics stored in the Row Group footer to skip entire chunks of data before reading a single row.
+- **Superior Compression:** Because a single column contains homogeneous data types, Dictionary Encoding, Run-Length Encoding (RLE), and ZSTD compression achieve dramatic size reductions.
+
+\`\`\`mermaid
+graph TD
+    subgraph Parquet File
+        M1[PAR1 Magic Number]
+        subgraph Row Group 1
+            C1[Column Chunk: UserID]
+            C2[Column Chunk: EventTime]
+            C3[Column Chunk: Amount]
+        end
+        subgraph File Footer
+            S[Schema & Metadata]
+            O[Row Group Byte Offsets]
+            ST[Min/Max Column Stats]
+        end
+        M2[PAR1 Magic Number]
+        M1 --> Row_Group_1
+        Row_Group_1 --> File_Footer
+        File_Footer --> M2
+    end
+\`\`\`
+
+## Practical Takeaways for Production Pipelines
+
+1. **Right-size your Row Groups:** Aim for 128MB to 512MB per file so distributed engines like Spark and Trino can parallelize reads without small-file overhead.
+2. **Use ZSTD Compression:** For modern cloud pipelines, ZSTD provides a significantly better compression ratio than Snappy with nearly identical CPU throughput.
+3. **Sort before writing:** Sorting data by frequently filtered columns maximizes the effectiveness of min/max statistics in Row Group footers.`
+  },
+  {
+    id: "spark-pipeline-optimization-playbook",
+    title: "Cutting Spark Pipeline Runtime by 82%: A Field Playbook",
+    date: "2026-07-18",
+    excerpt: "How we took a 13-hour daily payment settlement ETL pipeline down to 2.3 hours by eliminating shuffle bottlenecks, tuning partitions, and rethinking join strategies.",
+    tags: ["Apache Spark", "Performance", "Data Engineering", "Systems"],
+    imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=1600&auto=format&fit=crop",
+    content: `## When Daily Batch Jobs Start Missing Morning SLAs
+
+In high-volume payment processing, every hour of ETL delay pushes back reconciliation and executive reporting. When our daily settlement pipeline crossed the 13-hour mark, incremental hardware scaling stopped working—we needed architectural optimization.
+
+## The Three Bottlenecks That Matter Most
+
+### 1. Eliminating Unnecessary Shuffles with Broadcast Joins
+
+Joining a multi-billion-row transaction table against dimension tables (merchants, banks, terminal metadata) was triggering massive network shuffles across executors. By explicitly broadcasting lookup tables under 100MB and pre-filtering dimension keys, we eliminated 65% of shuffle spill to disk.
+
+### 2. Handling Data Skew in High-Volume Merchants
+
+A handful of super-merchants accounted for nearly 30% of daily transactions, leaving a single Spark task running for hours while 199 other executors sat idle.
+
+> In distributed systems, your pipeline is only as fast as your slowest partition. Fixing data skew is almost always higher leverage than adding more worker nodes.
+
+By enabling Adaptive Query Execution (AQE) skew join handling and salting the heaviest aggregation keys, task duration variance dropped from hours to seconds.
+
+### 3. Partition Alignment and Small File Compaction
+
+Writing thousands of uncompacted intermediate partitions created severe NameNode and S3 listing overhead downstream. Coalescing output partitions by date and merchant tier reduced downstream read latency by 4x and cut cloud compute costs by 40%.`
+  },
+  {
+    id: "modern-lakehouse-iceberg-delta",
+    title: "Designing Reliable Lakehouses with Apache Iceberg & Delta Lake",
+    date: "2026-06-05",
+    excerpt: "Why raw Parquet lakes eventually turn into data swamps, and how open table formats bring ACID transactions, schema evolution, and time travel to cloud object storage.",
+    tags: ["Lakehouse", "Apache Iceberg", "Architecture", "Cloud"],
+    imageUrl: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1600&auto=format&fit=crop",
+    content: `## Beyond Raw Files on Object Storage
+
+Storing raw Parquet files in S3 or HDFS works well until multiple writers, late-arriving healthcare or financial records, and schema changes enter the picture. Without a transactional metadata layer, partial writes corrupt downstream queries and directory listings become a bottleneck.
+
+## What Open Table Formats Actually Solve
+
+- **ACID Transactions on Object Storage:** Optimistic concurrency control ensures readers never see partial or failed job writes.
+- **Hidden Partitioning & Partition Evolution:** In Apache Iceberg, analysts don't need to know physical partition columns to get fast queries, and you can evolve partitioning from monthly to daily without rewriting historical data.
+- **Time Travel & Reproducibility:** Snapshot isolation lets data engineers audit exact table states as of any historical timestamp or roll back bad ingestion runs instantly.
+
+> A modern data architecture isn't defined by how much data it stores, but by how safely and predictably it can evolve when business requirements change.`
   }
 ];

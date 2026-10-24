@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createClient } from "@libsql/client";
 import path from "path";
+import fs from "fs/promises";
 import { fileURLToPath } from "url";
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
@@ -17,22 +18,78 @@ const db = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-// Initialize Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+const hasCloudinaryConfig = Boolean(
+  process.env.CLOUDINARY_CLOUD_NAME &&
+  process.env.CLOUDINARY_API_KEY &&
+  process.env.CLOUDINARY_API_SECRET
+);
+
+// Initialize Cloudinary if configured
+if (hasCloudinaryConfig) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+}
+
+const storage = hasCloudinaryConfig
+  ? new CloudinaryStorage({
+      cloudinary: cloudinary,
+      params: {
+        folder: "portfolio_uploads",
+        allowed_formats: ["jpg", "png", "jpeg", "gif", "webp"],
+      } as any,
+    })
+  : multer.memoryStorage();
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "portfolio_uploads",
-    allowed_formats: ["jpg", "png", "jpeg", "gif", "webp"],
-  } as any,
-});
+/**
+ * Syncs the current blogs table back into src/data/content.ts when running locally
+ * so that new/edited posts created in the Admin Dashboard are ready to commit & push to Git.
+ */
+async function syncBlogsToContentFile() {
+  if (process.env.VERCEL) return false;
+  try {
+    const contentFilePath = path.join(__dirname, "src", "data", "content.ts");
+    const fileText = await fs.readFile(contentFilePath, "utf-8");
+    const result = await db.execute("SELECT * FROM blogs ORDER BY date DESC");
+    const blogsArray = result.rows.map((b: any) => ({
+      id: String(b.id),
+      title: String(b.title),
+      date: String(b.date),
+      excerpt: String(b.excerpt),
+      imageUrl: b.imageUrl ? String(b.imageUrl) : undefined,
+      tags: b.tags ? JSON.parse(String(b.tags)) : [],
+      content: String(b.content),
+    }));
 
-const upload = multer({ storage: storage });
+    const startMarker = "export const BLOG_POSTS: BlogPost[] = ";
+    const endMarker = "\nexport const PERSONAL_INFO";
+    const startIdx = fileText.indexOf(startMarker);
+    const endIdx = fileText.indexOf(endMarker);
+
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      const serialized = JSON.stringify(blogsArray, null, 2);
+      const updatedFileText =
+        fileText.slice(0, startIdx) +
+        startMarker +
+        serialized +
+        ";\n" +
+        fileText.slice(endIdx);
+      await fs.writeFile(contentFilePath, updatedFileText, "utf-8");
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error("Failed to sync blogs to src/data/content.ts:", err);
+    return false;
+  }
+}
 
 async function initDB() {
   await db.executeMultiple(`
@@ -87,13 +144,24 @@ async function initDB() {
     // Column might already exist
   }
 
-  // Seed initial data if tables are empty
-  const blogsCount = await db.execute("SELECT COUNT(*) as count FROM blogs");
-  if ((blogsCount.rows[0].count as number) === 0) {
-    for (const blog of BLOG_POSTS) {
+  // Ensure all default BLOG_POSTS exist and have their cover images backfilled
+  for (const blog of BLOG_POSTS) {
+    await db.execute({
+      sql: `INSERT OR IGNORE INTO blogs (id, title, date, excerpt, content, tags, imageUrl) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        blog.id,
+        blog.title,
+        blog.date,
+        blog.excerpt,
+        blog.content,
+        JSON.stringify(blog.tags),
+        blog.imageUrl || null,
+      ],
+    });
+    if (blog.imageUrl) {
       await db.execute({
-        sql: `INSERT INTO blogs (id, title, date, excerpt, content, tags, imageUrl) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        args: [blog.id, blog.title, blog.date, blog.excerpt, blog.content, JSON.stringify(blog.tags), blog.imageUrl || null]
+        sql: `UPDATE blogs SET imageUrl = ? WHERE id = ? AND (imageUrl IS NULL OR imageUrl = '')`,
+        args: [blog.imageUrl, blog.id],
       });
     }
   }
@@ -103,7 +171,15 @@ async function initDB() {
     for (const book of BOOKS) {
       await db.execute({
         sql: `INSERT INTO books (id, title, author, category, cover, isReading, rating) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        args: [book.id, book.title, book.author, book.category, book.cover, book.isReading ? 1 : 0, book.rating || null]
+        args: [
+          book.id,
+          book.title,
+          book.author,
+          book.category,
+          book.cover,
+          book.isReading ? 1 : 0,
+          book.rating || null,
+        ],
       });
     }
   }
@@ -113,7 +189,7 @@ async function initDB() {
     for (const game of GAMES) {
       await db.execute({
         sql: `INSERT INTO games (id, title, platform, status, imageUrl, icon) VALUES (?, ?, ?, ?, ?, ?)`,
-        args: [game.id, game.title, game.platform, game.status, game.imageUrl, game.icon]
+        args: [game.id, game.title, game.platform, game.status, game.imageUrl, game.icon],
       });
     }
   }
@@ -121,16 +197,24 @@ async function initDB() {
   const projectsCount = await db.execute("SELECT COUNT(*) as count FROM projects");
   if ((projectsCount.rows[0].count as number) === 0) {
     for (const proj of PROJECTS) {
-      const id = proj.title.toLowerCase().replace(/\s+/g, '-');
+      const id = proj.title.toLowerCase().replace(/\s+/g, "-");
       await db.execute({
         sql: `INSERT INTO projects (id, title, category, description, tags, link, githubUrl, liveUrl, deepDiveProblem, deepDiveSolution, deepDiveOutcome, deepDiveArchitecture)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
-          id, proj.title, proj.category, proj.description, JSON.stringify(proj.tags), 
-          proj.link || null, proj.githubUrl || null, proj.liveUrl || null,
-          proj.deepDive?.problem || null, proj.deepDive?.solution || null,
-          proj.deepDive?.outcome || null, proj.deepDive?.architecture || null
-        ]
+          id,
+          proj.title,
+          proj.category,
+          proj.description,
+          JSON.stringify(proj.tags),
+          proj.link || null,
+          proj.githubUrl || null,
+          proj.liveUrl || null,
+          proj.deepDive?.problem || null,
+          proj.deepDive?.solution || null,
+          proj.deepDive?.outcome || null,
+          proj.deepDive?.architecture || null,
+        ],
       });
     }
   }
@@ -142,14 +226,30 @@ await initDB();
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: "15mb" }));
 
-// File Upload API
-app.post("/api/upload", upload.single("image"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded" });
-  }
-  res.json({ url: req.file.path });
+// File Upload API (supports Cloudinary when configured, or returns a data URL / client fallback)
+app.post("/api/upload", (req, res) => {
+  upload.single("image")(req, res, (err: any) => {
+    if (err) {
+      return res.status(200).json({
+        fallback: true,
+        error: err.message || "Upload middleware fallback",
+      });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+    if (hasCloudinaryConfig && (req.file as any).path) {
+      return res.json({ url: (req.file as any).path });
+    }
+    if (req.file.buffer) {
+      const mimeType = req.file.mimetype || "image/jpeg";
+      const base64 = req.file.buffer.toString("base64");
+      return res.json({ url: `data:${mimeType};base64,${base64}`, localInline: true });
+    }
+    return res.status(200).json({ fallback: true });
+  });
 });
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin@Host2026!";
@@ -187,9 +287,17 @@ app.post("/api/blogs", async (req, res) => {
         tags=excluded.tags,
         imageUrl=excluded.imageUrl
     `,
-    args: [id, title, date, excerpt, content, JSON.stringify(tags), imageUrl]
+    args: [id, title, date, excerpt, content, JSON.stringify(tags), imageUrl],
   });
-  res.json({ success: true });
+  const syncedToCode = await syncBlogsToContentFile();
+  res.json({ success: true, syncedToCode });
+});
+
+app.post("/api/blogs/sync-to-code", async (req, res) => {
+  const { password } = req.body;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: "Unauthorized" });
+  const syncedToCode = await syncBlogsToContentFile();
+  res.json({ success: syncedToCode });
 });
 
 app.delete("/api/blogs/:id", async (req, res) => {
@@ -198,9 +306,10 @@ app.delete("/api/blogs/:id", async (req, res) => {
 
   await db.execute({
     sql: "DELETE FROM blogs WHERE id = ?",
-    args: [req.params.id]
+    args: [req.params.id],
   });
-  res.json({ success: true });
+  const syncedToCode = await syncBlogsToContentFile();
+  res.json({ success: true, syncedToCode });
 });
 
 // Books API
@@ -226,7 +335,7 @@ app.post("/api/books", async (req, res) => {
         isReading=excluded.isReading,
         rating=excluded.rating
     `,
-    args: [id, title, author, category, cover, isReading ? 1 : 0, rating || null]
+    args: [id, title, author, category, cover, isReading ? 1 : 0, rating || null],
   });
   res.json({ success: true });
 });
@@ -237,7 +346,7 @@ app.delete("/api/books/:id", async (req, res) => {
 
   await db.execute({
     sql: "DELETE FROM books WHERE id = ?",
-    args: [req.params.id]
+    args: [req.params.id],
   });
   res.json({ success: true });
 });
@@ -264,7 +373,7 @@ app.post("/api/games", async (req, res) => {
         imageUrl=excluded.imageUrl,
         icon=excluded.icon
     `,
-    args: [id, title, platform, status, imageUrl, icon]
+    args: [id, title, platform, status, imageUrl, icon],
   });
   res.json({ success: true });
 });
@@ -275,7 +384,7 @@ app.delete("/api/games/:id", async (req, res) => {
 
   await db.execute({
     sql: "DELETE FROM games WHERE id = ?",
-    args: [req.params.id]
+    args: [req.params.id],
   });
   res.json({ success: true });
 });
@@ -283,22 +392,24 @@ app.delete("/api/games/:id", async (req, res) => {
 // Projects API
 app.get("/api/projects", async (req, res) => {
   const result = await db.execute("SELECT * FROM projects");
-  res.json(result.rows.map((p: any) => ({
-    id: p.id,
-    title: p.title,
-    category: p.category,
-    description: p.description,
-    tags: p.tags ? JSON.parse(p.tags) : [],
-    link: p.link,
-    githubUrl: p.githubUrl,
-    liveUrl: p.liveUrl,
-    deepDive: {
-      problem: p.deepDiveProblem,
-      solution: p.deepDiveSolution,
-      outcome: p.deepDiveOutcome,
-      architecture: p.deepDiveArchitecture
-    }
-  })));
+  res.json(
+    result.rows.map((p: any) => ({
+      id: p.id,
+      title: p.title,
+      category: p.category,
+      description: p.description,
+      tags: p.tags ? JSON.parse(p.tags) : [],
+      link: p.link,
+      githubUrl: p.githubUrl,
+      liveUrl: p.liveUrl,
+      deepDive: {
+        problem: p.deepDiveProblem,
+        solution: p.deepDiveSolution,
+        outcome: p.deepDiveOutcome,
+        architecture: p.deepDiveArchitecture,
+      },
+    }))
+  );
 });
 
 app.post("/api/projects", async (req, res) => {
@@ -325,10 +436,19 @@ app.post("/api/projects", async (req, res) => {
           deepDiveArchitecture=excluded.deepDiveArchitecture
       `,
       args: [
-        id, title, category, description, JSON.stringify(tags || []), link || null, githubUrl || null, liveUrl || null,
-        deepDive?.problem || null, deepDive?.solution || null,
-        deepDive?.outcome || null, deepDive?.architecture || null
-      ]
+        id,
+        title,
+        category,
+        description,
+        JSON.stringify(tags || []),
+        link || null,
+        githubUrl || null,
+        liveUrl || null,
+        deepDive?.problem || null,
+        deepDive?.solution || null,
+        deepDive?.outcome || null,
+        deepDive?.architecture || null,
+      ],
     });
     res.json({ success: true });
   } catch (err: any) {
@@ -343,7 +463,7 @@ app.delete("/api/projects/:id", async (req, res) => {
   try {
     await db.execute({
       sql: "DELETE FROM projects WHERE id = ?",
-      args: [req.params.id]
+      args: [req.params.id],
     });
     res.json({ success: true });
   } catch (err: any) {
@@ -351,7 +471,6 @@ app.delete("/api/projects/:id", async (req, res) => {
   }
 });
 
-// Vite middleware for development
 // Vite middleware for development
 if (process.env.NODE_ENV !== "production") {
   const { createServer: createViteServer } = await import("vite");

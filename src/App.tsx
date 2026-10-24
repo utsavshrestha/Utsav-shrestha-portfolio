@@ -48,7 +48,15 @@ import {
   ImagePlus,
   ChevronLeft,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  ArrowUpRight,
+  Copy,
+  Check,
+  Share2,
+  BookOpen,
+  Sparkles,
+  SlidersHorizontal,
+  GitBranch
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -536,7 +544,7 @@ export default function App() {
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [blogs, setBlogs] = useState<BlogPost[]>([]);
+  const [blogs, setBlogs] = useState<BlogPost[]>(INITIAL_BLOG_POSTS);
   const [adminPassword, setAdminPassword] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -545,17 +553,62 @@ export default function App() {
   const [games, setGames] = useState<Game[]>(INITIAL_GAMES);
   const [blogSearch, setBlogSearch] = useState('');
   const [blogCategory, setBlogCategory] = useState('All');
+  const [blogSort, setBlogSort] = useState<'newest' | 'oldest' | 'shortest'>('newest');
+  const [blogPage, setBlogPage] = useState(1);
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
   const [projectCategory, setProjectCategory] = useState('All');
   const [adminSection, setAdminSection] = useState<'blogs' | 'books' | 'games' | 'projects' | 'resume'>('blogs');
   const [blogEditorMode, setBlogEditorMode] = useState<'write' | 'preview'>('write');
   const [blogSaveState, setBlogSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
+  const formatBlogDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parsed = new Date(`${dateStr}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return dateStr;
+    return parsed.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const extractHeadings = (markdown: string) => {
+    if (!markdown) return [];
+    return markdown
+      .split('\n')
+      .filter(line => /^##\s+/.test(line.trim()))
+      .map(line => line.trim().replace(/^##\s+/, '').trim());
+  };
+
   const blogCategories = ['All', ...Array.from(new Set(blogs.flatMap(p => p.tags)))];
-  const filteredBlogs = blogs.filter(post => {
-    const matchesSearch = post.title.toLowerCase().includes(blogSearch.toLowerCase()) || post.excerpt.toLowerCase().includes(blogSearch.toLowerCase());
-    const matchesCategory = blogCategory === 'All' || post.tags.includes(blogCategory);
-    return matchesSearch && matchesCategory;
-  });
+  const filteredBlogs = blogs
+    .filter(post => {
+      const q = blogSearch.toLowerCase();
+      const matchesSearch =
+        post.title.toLowerCase().includes(q) ||
+        post.excerpt.toLowerCase().includes(q) ||
+        post.tags.some(t => t.toLowerCase().includes(q));
+      const matchesCategory = blogCategory === 'All' || post.tags.includes(blogCategory);
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => {
+      if (blogSort === 'oldest') return a.date.localeCompare(b.date);
+      if (blogSort === 'shortest') return getReadingTime(a.content) - getReadingTime(b.content);
+      return b.date.localeCompare(a.date);
+    });
+
+  const BLOGS_PER_PAGE = 6;
+  const featuredBlogPost = filteredBlogs[0] || null;
+  const gridSourceBlogs =
+    !blogSearch && blogCategory === 'All' && blogSort === 'newest' && filteredBlogs.length > 1
+      ? filteredBlogs.slice(1)
+      : filteredBlogs;
+  const totalBlogPages = Math.max(1, Math.ceil(gridSourceBlogs.length / BLOGS_PER_PAGE));
+  const currentBlogPage = Math.min(blogPage, totalBlogPages);
+  const paginatedGridBlogs = gridSourceBlogs.slice(
+    (currentBlogPage - 1) * BLOGS_PER_PAGE,
+    currentBlogPage * BLOGS_PER_PAGE
+  );
 
   const projectCategories = ['All', ...Array.from(new Set(projects.flatMap(p => p.tags)))];
   const filteredProjects = projects.filter(project => {
@@ -639,14 +692,22 @@ export default function App() {
     icon: 'Award'
   });
 
-  // Fetch blogs
+  // Fetch blogs (merges live DB blogs with static INITIAL_BLOG_POSTS fallback)
   const fetchBlogs = async () => {
     try {
       const res = await fetch('/api/blogs');
+      if (!res.ok) return;
       const data = await res.json();
-      setBlogs(data);
+      if (Array.isArray(data) && data.length > 0) {
+        const dbIds = new Set(data.map((b: BlogPost) => b.id));
+        const merged = [
+          ...data,
+          ...INITIAL_BLOG_POSTS.filter(b => !dbIds.has(b.id))
+        ].sort((a, b) => b.date.localeCompare(a.date));
+        setBlogs(merged);
+      }
     } catch (err) {
-      console.error("Failed to fetch blogs", err);
+      console.error("Failed to fetch blogs, using static bundle", err);
     }
   };
 
@@ -734,6 +795,13 @@ export default function App() {
     }
   };
 
+  const slugifyTitle = (title: string) =>
+    title
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || Date.now().toString();
+
   const handleSaveBlog = async () => {
     if (!editingPost.title?.trim() || !editingPost.content?.trim()) {
       setBlogSaveState('error');
@@ -741,11 +809,15 @@ export default function App() {
     }
 
     setBlogSaveState('saving');
-    const postToSave = {
-      ...editingPost,
-      id: editingPost.id || Date.now().toString(),
+    const postToSave: BlogPost = {
+      id: editingPost.id?.trim() || slugifyTitle(editingPost.title),
+      title: editingPost.title.trim(),
       date: editingPost.date || new Date().toISOString().split('T')[0],
-      tags: typeof editingPost.tags === 'string' ? (editingPost.tags as string).split(',').map(t => t.trim()).filter(Boolean) : editingPost.tags,
+      excerpt: editingPost.excerpt?.trim() || editingPost.content.trim().slice(0, 180) + '...',
+      content: editingPost.content,
+      tags: typeof editingPost.tags === 'string'
+        ? (editingPost.tags as string).split(',').map(t => t.trim()).filter(Boolean)
+        : (editingPost.tags || ['Data Engineering']),
       imageUrl: editingPost.imageUrl || ''
     };
 
@@ -756,8 +828,10 @@ export default function App() {
         body: JSON.stringify({ password: adminPassword, blog: postToSave })
       });
       if (res.ok) {
-        fetchBlogs();
-        setEditingPost({ title: '', excerpt: '', content: '', tags: [], imageUrl: '' });
+        const data = await res.json().catch(() => ({}));
+        if (data.syncedToCode) setSyncStatus('synced');
+        await fetchBlogs();
+        setEditingPost({ title: '', excerpt: '', content: '', tags: [], imageUrl: '', date: '' });
         setBlogEditorMode('write');
         setBlogSaveState('saved');
       } else {
@@ -766,6 +840,32 @@ export default function App() {
     } catch (err) {
       setBlogSaveState('error');
     }
+  };
+
+  const handleSyncBlogsToCode = async () => {
+    setSyncStatus('syncing');
+    try {
+      const res = await fetch('/api/blogs/sync-to-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPassword })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setSyncStatus('synced');
+      } else {
+        setSyncStatus('error');
+      }
+    } catch {
+      setSyncStatus('error');
+    }
+  };
+
+  const handleCopyBlogsCode = () => {
+    const exportString = `export const BLOG_POSTS: BlogPost[] = ${JSON.stringify(blogs, null, 2)};`;
+    navigator.clipboard.writeText(exportString);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2500);
   };
 
   const handleDeleteBlog = async (id: string) => {
@@ -851,6 +951,32 @@ export default function App() {
     }
   };
 
+  const compressImageToDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxWidth = 1280;
+          const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(String(e.target?.result || ''));
+            return;
+          }
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/webp', 0.82));
+        };
+        img.onerror = reject;
+        img.src = String(e.target?.result || '');
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
   const handleFileUpload = async (file: File): Promise<string | null> => {
     const formData = new FormData();
     formData.append('image', file);
@@ -862,14 +988,20 @@ export default function App() {
       });
       if (res.ok) {
         const data = await res.json();
-        return data.url;
+        if (data.url && !data.localInline) {
+          return data.url;
+        }
       }
-      alert("Failed to upload image.");
-      return null;
+      // Automatic client-side compressed image fallback if Cloudinary env vars are not set
+      return await compressImageToDataUrl(file);
     } catch (err) {
-      console.error("Error uploading file:", err);
-      alert("Error uploading image.");
-      return null;
+      console.warn('Falling back to client-side image compression:', err);
+      try {
+        return await compressImageToDataUrl(file);
+      } catch {
+        alert('Error processing image.');
+        return null;
+      }
     }
   };
 
@@ -1642,243 +1774,519 @@ export default function App() {
             </PageTransition>
           )}
 
-          {/* BLOG */}
+          {/* BLOG — Untitled UI Inspired Editorial Feature */}
           {activeTab === 'blog' && (
             <PageTransition key="blog" id="blog">
               {!selectedPost ? (
-                <>
-                  <SectionHeader title="Insights & Research" subtitle="The Data Blog" />
-                  
-                  <div className="flex flex-col md:flex-row gap-4 mb-8">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
-                      <input 
-                        type="text" 
-                        placeholder="Search articles..." 
-                        value={blogSearch}
-                        onChange={(e) => setBlogSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 transition-all dark:text-white"
-                      />
-                    </div>
-                    <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
-                      {blogCategories.map(cat => (
-                        <button
-                          key={cat}
-                          onClick={() => setBlogCategory(cat)}
-                          className={clsx(
-                            "whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-colors",
-                            blogCategory === cat 
-                              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900" 
-                              : "bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                          )}
-                        >
-                          {cat}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-between gap-3 mb-10 text-xs font-mono uppercase tracking-widest text-zinc-400">
-                    <span>{filteredBlogs.length} {filteredBlogs.length === 1 ? 'article' : 'articles'}{blogSearch || blogCategory !== 'All' ? ' found' : ''}</span>
-                    {(blogSearch || blogCategory !== 'All') && (
-                      <button
-                        type="button"
-                        onClick={() => { setBlogSearch(''); setBlogCategory('All'); }}
-                        className="text-zinc-900 dark:text-zinc-100 hover:opacity-60 transition-opacity"
-                      >
-                        Clear filters
-                      </button>
-                    )}
-                  </div>
-
-                  {filteredBlogs.length > 0 ? (
-                    <div className="space-y-16">
-                      {/* Featured Post */}
-                      <div 
-                        key={filteredBlogs[0].id} 
-                        className="group cursor-pointer flex flex-col md:flex-row gap-8 items-center"
-                        onClick={() => setSelectedPost(filteredBlogs[0])}
-                      >
-                        <div className="w-full md:w-1/2 lg:w-3/5 aspect-[16/9] md:aspect-[4/3] lg:aspect-[16/9] bg-zinc-200 rounded-2xl overflow-hidden relative shadow-sm group-hover:shadow-md transition-all">
-                          <img 
-                            src={filteredBlogs[0].imageUrl || `https://picsum.photos/seed/${filteredBlogs[0].id}/800/450`} 
-                            alt={filteredBlogs[0].title} 
-                            className="object-cover w-full h-full grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700"
-                            referrerPolicy="no-referrer"
-                          />
-                          <div className="absolute top-4 left-4">
-                            <Badge className="bg-white/90 text-zinc-900 border-none backdrop-blur-sm shadow-sm">{filteredBlogs[0].tags[0]}</Badge>
-                          </div>
-                        </div>
-                        <div className="w-full md:w-1/2 lg:w-2/5 flex flex-col justify-center">
-                          <span className="text-[10px] font-mono uppercase tracking-[0.24em] text-zinc-400 mb-4">Featured insight</span>
-                          <div className="flex items-center gap-3 text-zinc-500 dark:text-zinc-400 text-sm font-mono mb-4">
-                            <Calendar size={14} />
-                            <span>{filteredBlogs[0].date}</span>
-                            <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
-                            <Clock size={14} />
-                            <span>{getReadingTime(filteredBlogs[0].content)} min read</span>
-                          </div>
-                          <h3 className="text-3xl lg:text-4xl font-bold mb-4 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 dark:text-white transition-colors leading-tight text-zinc-900">
-                            {filteredBlogs[0].title}
-                          </h3>
-                          <p className="text-zinc-500 dark:text-zinc-400 text-base leading-relaxed mb-6 line-clamp-3">
-                            {filteredBlogs[0].excerpt}
-                          </p>
-                          <div className="flex flex-wrap gap-2 mb-6">
-                            {filteredBlogs[0].tags.slice(0, 3).map(tag => (
-                              <span key={tag} className="text-xs text-zinc-500 dark:text-zinc-400">#{tag}</span>
-                            ))}
-                          </div>
-                          <div className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100 font-semibold text-sm border-b border-zinc-900 dark:border-white pb-1 w-fit">
-                            Read Full Article <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                          </div>
-                        </div>
+                <div className="space-y-12 pb-16">
+                  {/* Untitled UI Editorial Header & Subscribe Bar */}
+                  <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 pb-4">
+                    <div className="max-w-2xl">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-4">
+                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-900 dark:bg-white" />
+                        <span>Our blog</span>
                       </div>
-
-                      {/* Remaining Posts Grid */}
-                      {filteredBlogs.length > 1 && (
-                        <>
-                          <div className="w-full h-px bg-zinc-200 dark:bg-zinc-800" />
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                            {filteredBlogs.slice(1).map(post => (
-                              <div 
-                                key={post.id} 
-                                className="group cursor-pointer flex flex-col h-full"
-                                onClick={() => setSelectedPost(post)}
-                              >
-                                <div className="aspect-[16/10] bg-zinc-200 rounded-xl mb-6 overflow-hidden relative shadow-sm group-hover:shadow-md transition-all">
-                                  <img 
-                                    src={post.imageUrl || `https://picsum.photos/seed/${post.id}/800/450`} 
-                                    alt={post.title} 
-                                    className="object-cover w-full h-full grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700"
-                                    referrerPolicy="no-referrer"
-                                  />
-                                  <div className="absolute top-4 left-4">
-                                    <Badge className="bg-white/90 text-zinc-900 border-none backdrop-blur-sm shadow-sm">{post.tags[0]}</Badge>
-                                  </div>
-                                </div>
-                                <div className="flex flex-col flex-grow">
-                                  <div className="flex items-center gap-3 text-zinc-400 text-xs font-mono mb-3">
-                                    <span>{post.date}</span>
-                                    <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
-                                    <span>{getReadingTime(post.content)} min</span>
-                                  </div>
-                                  <h3 className="text-xl font-bold mb-3 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 dark:text-white transition-colors leading-tight text-zinc-900">
-                                    {post.title}
-                                  </h3>
-                                  <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed line-clamp-2 mt-auto mb-4">
-                                    {post.excerpt}
-                                  </p>
-                                  <div className="flex items-center justify-between gap-4 text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                                    <span className="flex flex-wrap gap-2">
-                                      {post.tags.slice(0, 2).map(tag => <span key={tag}>#{tag}</span>)}
-                                    </span>
-                                    <span className="inline-flex items-center gap-1 text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
-                                      Read <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      )}
+                      <h1 className="text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-zinc-900 dark:text-white leading-[1.08]">
+                        Writings on Data, Systems &amp; AI
+                      </h1>
+                      <p className="text-lg sm:text-xl text-zinc-500 dark:text-zinc-400 mt-4 leading-relaxed">
+                        The latest architectural deep dives, distributed systems playbooks, and engineering field notes.
+                      </p>
                     </div>
-                  ) : (
-                    <div className="py-20 px-6 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
-                      <div className="max-w-md mx-auto text-center">
-                        <span className="text-[10px] font-mono uppercase tracking-[0.24em] text-zinc-400">The notebook is open</span>
-                        <h3 className="text-2xl font-serif italic text-zinc-900 dark:text-white mt-3 mb-3">The first field note is on its way.</h3>
-                        <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed">Research, systems, and lessons from building with data will live here.</p>
+
+                    <div className="w-full lg:w-auto lg:min-w-[380px]">
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (newsletterEmail.trim()) {
+                            setNewsletterSubscribed(true);
+                            setNewsletterEmail('');
+                          }
+                        }}
+                        className="flex flex-col sm:flex-row gap-2.5"
+                      >
+                        <input
+                          type="email"
+                          required
+                          value={newsletterEmail}
+                          onChange={(e) => setNewsletterEmail(e.target.value)}
+                          placeholder="Enter your email"
+                          className="flex-1 px-4 py-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 shadow-xs"
+                        />
+                        <button
+                          type="submit"
+                          className="px-5 py-3 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors shrink-0 shadow-xs"
+                        >
+                          {newsletterSubscribed ? 'Subscribed ✓' : 'Subscribe'}
+                        </button>
+                      </form>
+                      <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
+                        {newsletterSubscribed
+                          ? 'Thanks for subscribing — new field notes will land in your inbox.'
+                          : 'New engineering deep dives & architecture notes. No spam, ever.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Featured Hero Post Card with Frosted Glass Overlay (Untitled UI Shot #23081977) */}
+                  {featuredBlogPost && !blogSearch && blogCategory === 'All' && blogSort === 'newest' && (
+                    <div
+                      onClick={() => {
+                        setSelectedPost(featuredBlogPost);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="group cursor-pointer relative rounded-3xl overflow-hidden bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-lg aspect-[4/5] sm:aspect-[16/10] lg:aspect-[20/10] flex flex-col justify-end"
+                    >
+                      <img
+                        src={featuredBlogPost.imageUrl || `https://picsum.photos/seed/${featuredBlogPost.id}/1400/800`}
+                        alt={featuredBlogPost.title}
+                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10 transition-opacity duration-500" />
+
+                      {/* Frosted Glass Bottom Panel */}
+                      <div className="relative z-10 backdrop-blur-md bg-black/45 border-t border-white/20 p-6 sm:p-8 lg:p-10 text-white">
+                        <div className="flex items-start justify-between gap-4 mb-3">
+                          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight leading-tight max-w-3xl group-hover:underline decoration-white/60 underline-offset-4">
+                            {featuredBlogPost.title}
+                          </h2>
+                          <span className="w-10 h-10 rounded-full bg-white/15 border border-white/25 flex items-center justify-center shrink-0 group-hover:bg-white group-hover:text-zinc-900 transition-all duration-300">
+                            <ArrowUpRight size={20} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                          </span>
+                        </div>
+
+                        <p className="text-white/80 text-sm sm:text-base leading-relaxed max-w-3xl line-clamp-2 mb-6 sm:mb-8">
+                          {featuredBlogPost.excerpt}
+                        </p>
+
+                        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 pt-4 border-t border-white/15">
+                          <div className="flex flex-wrap items-center gap-6 sm:gap-8">
+                            <div>
+                              <span className="block text-[11px] font-medium uppercase tracking-wider text-white/60 mb-1.5">Written by</span>
+                              <div className="flex items-center gap-2.5">
+                                <img
+                                  src={PERSONAL_INFO.image}
+                                  alt={PERSONAL_INFO.name}
+                                  className="w-7 h-7 rounded-full object-cover border border-white/30"
+                                  referrerPolicy="no-referrer"
+                                />
+                                <span className="text-sm font-medium text-white">{PERSONAL_INFO.name}</span>
+                              </div>
+                            </div>
+                            <div>
+                              <span className="block text-[11px] font-medium uppercase tracking-wider text-white/60 mb-1.5">Published on</span>
+                              <span className="text-sm font-medium text-white">{formatBlogDate(featuredBlogPost.date)}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[11px] font-medium uppercase tracking-wider text-white/60 mb-1.5">Reading time</span>
+                              <span className="text-sm font-medium text-white">{getReadingTime(featuredBlogPost.content)} min read</span>
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="block text-[11px] font-medium uppercase tracking-wider text-white/60 mb-1.5 sm:text-right">File under</span>
+                            <div className="flex flex-wrap gap-2">
+                              {featuredBlogPost.tags.map(tag => (
+                                <span
+                                  key={tag}
+                                  className="px-3 py-1 rounded-full text-xs font-medium border border-white/40 bg-white/10 text-white backdrop-blur-xs"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
-                </>
-              ) : (
-                <div className="max-w-4xl mx-auto pb-24">
-                  <button 
-                    onClick={() => setSelectedPost(null)}
-                    aria-label="Back to all blog posts"
-                    className="flex items-center gap-2 text-sm font-semibold tracking-wide text-zinc-500 hover:text-zinc-900 dark:hover:text-white mb-12 transition-colors uppercase"
-                  >
-                    <ArrowRight size={16} className="rotate-180" />
-                    <span>Back to all posts</span>
-                  </button>
-                  
-                  <div className="mb-12 md:mb-16">
-                    <span className="block text-[10px] font-mono uppercase tracking-[0.24em] text-zinc-400 mb-6">Field notes · Data, systems, and practice</span>
-                    <div className="flex flex-wrap gap-2 mb-6">
-                      {selectedPost.tags.map(tag => (
-                        <span key={tag} className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-full text-xs font-semibold tracking-wide">
-                          {tag}
-                        </span>
-                      ))}
+
+                  {/* Untitled UI Filter Tabs, Search & Sort Bar */}
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-0">
+                    <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar -mb-px">
+                      {blogCategories.map(cat => {
+                        const isActive = blogCategory === cat;
+                        const label = cat === 'All' ? 'View all' : cat;
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => {
+                              setBlogCategory(cat);
+                              setBlogPage(1);
+                            }}
+                            className={cn(
+                              'whitespace-nowrap px-4 py-3.5 text-sm font-medium border-b-2 transition-all',
+                              isActive
+                                ? 'border-zinc-900 dark:border-white text-zinc-900 dark:text-white'
+                                : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                            )}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
                     </div>
 
-                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif italic font-medium tracking-tight mb-6 leading-[1.05] dark:text-white text-zinc-900">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pb-3 lg:pb-2">
+                      <div className="relative min-w-[220px]">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
+                        <input
+                          type="text"
+                          placeholder="Search articles..."
+                          value={blogSearch}
+                          onChange={(e) => {
+                            setBlogSearch(e.target.value);
+                            setBlogPage(1);
+                          }}
+                          className="w-full pl-9 pr-8 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                        />
+                        {blogSearch && (
+                          <button
+                            type="button"
+                            onClick={() => { setBlogSearch(''); setBlogPage(1); }}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="relative flex items-center">
+                        <SlidersHorizontal size={14} className="absolute left-3.5 text-zinc-400 pointer-events-none" />
+                        <select
+                          aria-label="Sort blog posts"
+                          value={blogSort}
+                          onChange={(e) => {
+                            setBlogSort(e.target.value as 'newest' | 'oldest' | 'shortest');
+                            setBlogPage(1);
+                          }}
+                          className="pl-9 pr-8 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm font-medium text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 appearance-none cursor-pointer"
+                        >
+                          <option value="newest">Most recent</option>
+                          <option value="oldest">Oldest first</option>
+                          <option value="shortest">Shortest read</option>
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 text-zinc-400 pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3-Column Untitled UI Blog Card Grid */}
+                  {filteredBlogs.length > 0 ? (
+                    <div className="space-y-14">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
+                        {paginatedGridBlogs.map((post) => (
+                          <article
+                            key={post.id}
+                            onClick={() => {
+                              setSelectedPost(post);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className="group cursor-pointer flex flex-col h-full"
+                          >
+                            {/* Card Image + Frosted Glass Metadata Strip */}
+                            <div className="aspect-[16/10] bg-zinc-100 dark:bg-zinc-900 rounded-2xl mb-5 overflow-hidden relative border border-zinc-200/70 dark:border-zinc-800 shadow-xs group-hover:shadow-md transition-all">
+                              <img
+                                src={post.imageUrl || `https://picsum.photos/seed/${post.id}/800/500`}
+                                alt={post.title}
+                                className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500 ease-out"
+                                referrerPolicy="no-referrer"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent opacity-90" />
+                              <div className="absolute inset-x-0 bottom-0 backdrop-blur-md bg-black/40 border-t border-white/20 px-4 py-3 text-white flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold truncate">{PERSONAL_INFO.name}</p>
+                                  <p className="text-[11px] text-white/75">{formatBlogDate(post.date)}</p>
+                                </div>
+                                {post.tags[0] && (
+                                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium border border-white/35 bg-white/10 text-white shrink-0">
+                                    {post.tags[0]}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Card Text Content */}
+                            <div className="flex flex-col flex-grow">
+                              <div className="flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-2">
+                                <span>{post.tags[0] || 'Engineering'}</span>
+                                <span className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                                <span className="font-normal text-zinc-500 dark:text-zinc-400">{getReadingTime(post.content)} min read</span>
+                              </div>
+
+                              <div className="flex items-start justify-between gap-3 mb-2.5">
+                                <h3 className="text-xl font-semibold text-zinc-900 dark:text-white group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors leading-snug">
+                                  {post.title}
+                                </h3>
+                                <ArrowUpRight
+                                  size={20}
+                                  className="shrink-0 mt-1 text-zinc-900 dark:text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+                                />
+                              </div>
+
+                              <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed line-clamp-2 mb-5">
+                                {post.excerpt}
+                              </p>
+
+                              <div className="mt-auto pt-3 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <img
+                                    src={PERSONAL_INFO.image}
+                                    alt={PERSONAL_INFO.name}
+                                    className="w-7 h-7 rounded-full object-cover border border-zinc-200 dark:border-zinc-700"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                  <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">
+                                    {formatBlogDate(post.date)}
+                                  </span>
+                                </div>
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-zinc-900 dark:text-white group-hover:underline underline-offset-4">
+                                  Read post <ArrowUpRight size={14} />
+                                </span>
+                              </div>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+
+                      {/* Untitled UI Pagination Footer */}
+                      <div className="pt-6 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-4">
+                        <button
+                          type="button"
+                          disabled={currentBlogPage <= 1}
+                          onClick={() => setBlogPage(p => Math.max(1, p - 1))}
+                          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                        >
+                          <ArrowRight size={16} className="rotate-180" />
+                          <span>Previous</span>
+                        </button>
+
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: totalBlogPages }, (_, i) => i + 1).map(pageNum => (
+                            <button
+                              key={pageNum}
+                              type="button"
+                              onClick={() => setBlogPage(pageNum)}
+                              className={cn(
+                                'w-9 h-9 rounded-lg text-sm font-medium transition-colors',
+                                currentBlogPage === pageNum
+                                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
+                                  : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                              )}
+                            >
+                              {pageNum}
+                            </button>
+                          ))}
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={currentBlogPage >= totalBlogPages}
+                          onClick={() => setBlogPage(p => Math.min(totalBlogPages, p + 1))}
+                          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                        >
+                          <span>Next</span>
+                          <ArrowRight size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-20 px-6 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-200 dark:border-zinc-800 text-center">
+                      <div className="max-w-md mx-auto">
+                        <span className="text-xs font-mono uppercase tracking-widest text-zinc-400">No matching articles</span>
+                        <h3 className="text-2xl font-semibold text-zinc-900 dark:text-white mt-2 mb-2">No posts matched your filter</h3>
+                        <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6">
+                          Try clearing your search query or switching back to View all categories.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBlogSearch('');
+                            setBlogCategory('All');
+                            setBlogSort('newest');
+                            setBlogPage(1);
+                          }}
+                          className="px-4 py-2.5 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-medium"
+                        >
+                          Reset filters
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Single Post Reading View — Untitled UI Editorial Layout */
+                <div className="max-w-5xl mx-auto pb-24">
+                  <div className="flex items-center justify-between gap-4 mb-10">
+                    <button
+                      onClick={() => setSelectedPost(null)}
+                      aria-label="Back to all blog posts"
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+                    >
+                      <ArrowRight size={16} className="rotate-180" />
+                      <span>Back to blog</span>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(window.location.href);
+                          setCopiedLink(true);
+                          setTimeout(() => setCopiedLink(false), 2000);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+                      >
+                        {copiedLink ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                        <span>{copiedLink ? 'Link copied' : 'Copy link'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Centered Editorial Article Header */}
+                  <div className="text-center max-w-3xl mx-auto mb-10">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-xs font-semibold text-zinc-800 dark:text-zinc-200 mb-5">
+                      <span>{selectedPost.tags[0] || 'Engineering'}</span>
+                      <span className="w-1 h-1 rounded-full bg-zinc-400" />
+                      <span>{getReadingTime(selectedPost.content)} min read</span>
+                    </div>
+
+                    <h1 className="text-3xl sm:text-5xl font-semibold tracking-tight text-zinc-900 dark:text-white leading-[1.12] mb-5">
                       {selectedPost.title}
                     </h1>
 
                     {selectedPost.excerpt && (
-                      <p className="text-xl md:text-2xl text-zinc-500 dark:text-zinc-400 mb-8 leading-relaxed font-light max-w-3xl">
+                      <p className="text-lg sm:text-xl text-zinc-500 dark:text-zinc-400 leading-relaxed">
                         {selectedPost.excerpt}
                       </p>
                     )}
 
-                    <div className="flex items-center gap-4 py-6 border-y border-zinc-200 dark:border-zinc-800 mb-10">
-                      <img src={PERSONAL_INFO.image} alt={PERSONAL_INFO.name} className="w-12 h-12 rounded-full object-cover grayscale" />
-                      <div>
-                        <div className="font-semibold text-zinc-900 dark:text-white">{PERSONAL_INFO.name}</div>
-                        <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm font-mono mt-1">
-                          <span>{selectedPost.date}</span>
-                          <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
-                          <span>{getReadingTime(selectedPost.content)} min read</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="aspect-[16/9] sm:aspect-[2/1] bg-zinc-100 dark:bg-zinc-800 rounded-3xl overflow-hidden mb-12 lg:mb-16 shadow-sm border border-zinc-200 dark:border-zinc-800 relative group">
-                      <img 
-                        src={selectedPost.imageUrl || `https://picsum.photos/seed/${selectedPost.id}/1200/600`} 
-                        alt={`Illustration for ${selectedPost.title}`}
-                        className="object-cover w-full h-full grayscale group-hover:grayscale-0 transition-all duration-700"
+                    <div className="flex items-center justify-center gap-3 mt-8">
+                      <img
+                        src={PERSONAL_INFO.image}
+                        alt={PERSONAL_INFO.name}
+                        className="w-11 h-11 rounded-full object-cover border border-zinc-200 dark:border-zinc-700"
                         referrerPolicy="no-referrer"
                       />
+                      <div className="text-left">
+                        <div className="text-sm font-semibold text-zinc-900 dark:text-white">{PERSONAL_INFO.name}</div>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400">Published {formatBlogDate(selectedPost.date)}</div>
+                      </div>
                     </div>
                   </div>
 
-                  <BlogMarkdown content={selectedPost.content} className="max-w-3xl mx-auto" />
+                  {/* Full-Bleed Article Cover Image */}
+                  <div className="aspect-[16/9] bg-zinc-100 dark:bg-zinc-900 rounded-3xl overflow-hidden mb-14 shadow-md border border-zinc-200 dark:border-zinc-800">
+                    <img
+                      src={selectedPost.imageUrl || `https://picsum.photos/seed/${selectedPost.id}/1400/750`}
+                      alt={selectedPost.title}
+                      className="object-cover w-full h-full"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
 
+                  {/* 2-Column Editorial Layout: Sidebar Metadata + Prose */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+                    <aside className="lg:col-span-4 lg:sticky lg:top-28 space-y-6 order-2 lg:order-1">
+                      <div className="p-5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-4">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={PERSONAL_INFO.image}
+                            alt={PERSONAL_INFO.name}
+                            className="w-10 h-10 rounded-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div>
+                            <div className="text-sm font-semibold text-zinc-900 dark:text-white">{PERSONAL_INFO.name}</div>
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400">{PERSONAL_INFO.title}</div>
+                          </div>
+                        </div>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                          Writing about distributed data engineering, lakehouse storage internals, and high-leverage AI workflows.
+                        </p>
+                        <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex flex-wrap gap-1.5">
+                          {selectedPost.tags.map(tag => (
+                            <span
+                              key={tag}
+                              className="px-2.5 py-1 rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {extractHeadings(selectedPost.content).length > 0 && (
+                        <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-zinc-400 mb-3">
+                            <BookOpen size={14} />
+                            <span>In this article</span>
+                          </div>
+                          <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+                            {extractHeadings(selectedPost.content).map((heading, idx) => (
+                              <li key={idx} className="flex items-start gap-2 leading-snug">
+                                <span className="text-xs font-mono text-zinc-400 mt-0.5">{String(idx + 1).padStart(2, '0')}</span>
+                                <span>{heading}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </aside>
+
+                    <div className="lg:col-span-8 order-1 lg:order-2 min-w-0">
+                      <BlogMarkdown content={selectedPost.content} />
+                    </div>
+                  </div>
+
+                  {/* Related Posts Footer in Untitled UI Card Style */}
                   {blogs.filter(post => post.id !== selectedPost.id).slice(0, 3).length > 0 && (
-                    <section className="max-w-3xl mx-auto mt-20 pt-10 border-t border-zinc-200 dark:border-zinc-800">
-                      <div className="flex items-end justify-between gap-4 mb-6">
+                    <section className="mt-24 pt-12 border-t border-zinc-200 dark:border-zinc-800">
+                      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
                         <div>
-                          <span className="text-[10px] font-mono uppercase tracking-[0.24em] text-zinc-400">Keep exploring</span>
-                          <h2 className="text-2xl font-serif italic text-zinc-900 dark:text-white mt-2">More from the notebook</h2>
+                          <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">From the blog</span>
+                          <h2 className="text-2xl sm:text-3xl font-semibold text-zinc-900 dark:text-white mt-1">Latest writings &amp; playbooks</h2>
                         </div>
                         <button
                           type="button"
                           onClick={() => setSelectedPost(null)}
-                          className="text-xs font-mono uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-medium w-fit"
                         >
-                          All posts
+                          <span>View all posts</span>
+                          <ArrowUpRight size={16} />
                         </button>
                       </div>
-                      <div className="grid gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         {blogs.filter(post => post.id !== selectedPost.id).slice(0, 3).map(post => (
-                          <button
+                          <div
                             key={post.id}
-                            type="button"
-                            onClick={() => setSelectedPost(post)}
-                            className="group text-left flex items-center justify-between gap-4 py-4 border-b border-zinc-200 dark:border-zinc-800 hover:border-zinc-900 dark:hover:border-zinc-100 transition-colors"
+                            onClick={() => {
+                              setSelectedPost(post);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className="group cursor-pointer flex flex-col"
                           >
-                            <span>
-                              <span className="block text-xs font-mono text-zinc-400 mb-1">{post.date} · {getReadingTime(post.content)} min read</span>
-                              <span className="block font-medium text-zinc-900 dark:text-white group-hover:translate-x-1 transition-transform">{post.title}</span>
-                            </span>
-                            <ArrowRight size={16} className="shrink-0 text-zinc-400 group-hover:translate-x-1 transition-transform" />
-                          </button>
+                            <div className="aspect-[16/10] rounded-2xl overflow-hidden mb-4 relative border border-zinc-200 dark:border-zinc-800">
+                              <img
+                                src={post.imageUrl || `https://picsum.photos/seed/${post.id}/800/500`}
+                                alt={post.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                            <div className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1.5">
+                              {post.tags[0] || 'Engineering'} · {getReadingTime(post.content)} min read
+                            </div>
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <h3 className="font-semibold text-zinc-900 dark:text-white group-hover:underline underline-offset-4 leading-snug">
+                                {post.title}
+                              </h3>
+                              <ArrowUpRight size={16} className="shrink-0 mt-1 text-zinc-900 dark:text-white" />
+                            </div>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2">{post.excerpt}</p>
+                          </div>
                         ))}
                       </div>
                     </section>
@@ -2192,154 +2600,187 @@ export default function App() {
                   </div>
 
                   {adminSection === 'blogs' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                      <aside className="lg:col-span-4 space-y-4">
-                        <div className="flex items-end justify-between gap-4">
-                          <div>
-                            <h3 className="font-mono text-xs uppercase tracking-widest text-zinc-400">Posts</h3>
-                            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Choose a post to edit, or start a fresh dispatch.</p>
+                    <div className="space-y-8">
+                      {/* Admin Upload & Git Deployment Workflow Banner */}
+                      <div className="p-5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
+                            <GitBranch size={14} />
+                            <span>Admin Upload → Git → Vercel Deployment Pipeline</span>
                           </div>
-                          <span className="text-xs font-mono text-zinc-400">{blogs.length}</span>
+                          <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-2xl">
+                            When running locally (<code className="font-mono text-zinc-800 dark:text-zinc-200">npm run dev</code>), clicking <strong>Save post</strong> saves to SQLite <em>and</em> auto-syncs <code className="font-mono text-zinc-800 dark:text-zinc-200">src/data/content.ts</code> so you can commit and push to Git for instant Vercel deployment.
+                          </p>
                         </div>
-                        <div className="space-y-2">
-                          {blogs.length > 0 ? blogs.map(post => (
-                            <div key={post.id} className={cn("flex items-center gap-2 p-3 bg-white dark:bg-zinc-900 border rounded-xl group transition-colors", editingPost.id === post.id ? "border-zinc-900 dark:border-zinc-100" : "border-zinc-200 dark:border-zinc-800")}>
-                              <button
-                                type="button"
-                                onClick={() => { setEditingPost(post); setBlogEditorMode('write'); setBlogSaveState('idle'); }}
-                                className="min-w-0 flex-1 text-left"
-                              >
-                                <span className="block text-sm font-medium truncate dark:text-zinc-200">{post.title}</span>
-                                <span className="block text-[10px] font-mono text-zinc-400 mt-1">{post.date} · {getReadingTime(post.content)} min read</span>
-                              </button>
-                              <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                                <button type="button" aria-label={`Edit ${post.title}`} onClick={() => { setEditingPost(post); setBlogEditorMode('write'); setBlogSaveState('idle'); }} className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white"><Pencil size={15} /></button>
-                                <button type="button" aria-label={`Delete ${post.title}`} onClick={() => handleDeleteBlog(post.id)} className="p-1.5 text-zinc-400 hover:text-red-600"><Trash2 size={15} /></button>
-                              </div>
-                            </div>
-                          )) : (
-                            <div className="p-4 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 text-sm text-zinc-500 dark:text-zinc-400">Your published posts will appear here.</div>
-                          )}
+                        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
                           <button
                             type="button"
-                            onClick={() => { setEditingPost({ title: '', excerpt: '', content: '', tags: [], imageUrl: '' }); setBlogEditorMode('write'); setBlogSaveState('idle'); }}
-                            className="w-full py-3 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-500 hover:border-zinc-900 dark:hover:border-zinc-100 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all flex items-center justify-center gap-2"
+                            onClick={handleSyncBlogsToCode}
+                            className="px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs font-medium text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors flex items-center gap-1.5"
                           >
-                            <Plus size={18} /> New post
+                            <GitBranch size={14} />
+                            <span>{syncStatus === 'syncing' ? 'Syncing…' : syncStatus === 'synced' ? 'Synced to content.ts ✓' : 'Sync to content.ts'}</span>
                           </button>
                           <button
                             type="button"
-                            onClick={handleResetBlogs}
-                            className="w-full py-2 text-[10px] uppercase tracking-widest text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                            onClick={handleCopyBlogsCode}
+                            className="px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs font-medium text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors flex items-center gap-1.5"
                           >
-                            Reset to Defaults
+                            {copiedCode ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                            <span>{copiedCode ? 'Copied TS Code' : 'Copy BLOG_POSTS TS'}</span>
                           </button>
                         </div>
-                      </aside>
+                      </div>
 
-                      <div className="lg:col-span-8">
-                        <Card className="overflow-hidden p-0">
-                          <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-5 border-b border-zinc-200 dark:border-zinc-800">
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                        <aside className="lg:col-span-4 space-y-4">
+                          <div className="flex items-end justify-between gap-4">
                             <div>
-                              <span className="text-[10px] font-mono uppercase tracking-[0.24em] text-zinc-400">{editingPost.id ? 'Editing post' : 'New post'}</span>
-                              <h3 className="text-2xl font-serif italic text-zinc-900 dark:text-white mt-1">{editingPost.title || 'Untitled dispatch'}</h3>
-                              <div className="flex items-center gap-3 text-xs font-mono text-zinc-400 mt-2">
-                                <span>{editingPostWordCount} words</span>
-                                <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
-                                <span>{editingPostContent ? getReadingTime(editingPostContent) : 0} min read</span>
-                              </div>
+                              <h3 className="font-mono text-xs uppercase tracking-widest text-zinc-400">Published Posts</h3>
+                              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Select a post to edit or create a new article.</p>
                             </div>
-                            <div className="flex rounded-lg border border-zinc-200 dark:border-zinc-800 p-1 bg-zinc-50 dark:bg-zinc-950">
-                              <button type="button" onClick={() => setBlogEditorMode('write')} className={cn("flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors", blogEditorMode === 'write' ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm" : "text-zinc-400")}><Pencil size={14} /> Write</button>
-                              <button type="button" onClick={() => setBlogEditorMode('preview')} className={cn("flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors", blogEditorMode === 'preview' ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm" : "text-zinc-400")}><Eye size={14} /> Preview</button>
-                            </div>
+                            <span className="text-xs font-mono text-zinc-400">{blogs.length}</span>
                           </div>
+                          <div className="space-y-2">
+                            {blogs.length > 0 ? blogs.map(post => (
+                              <div key={post.id} className={cn("flex items-center gap-3 p-3 bg-white dark:bg-zinc-900 border rounded-xl group transition-colors", editingPost.id === post.id ? "border-zinc-900 dark:border-zinc-100" : "border-zinc-200 dark:border-zinc-800")}>
+                                {post.imageUrl && (
+                                  <img src={post.imageUrl} alt="" className="w-11 h-11 rounded-lg object-cover shrink-0 border border-zinc-200 dark:border-zinc-800" referrerPolicy="no-referrer" />
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => { setEditingPost(post); setBlogEditorMode('write'); setBlogSaveState('idle'); }}
+                                  className="min-w-0 flex-1 text-left"
+                                >
+                                  <span className="block text-sm font-medium truncate dark:text-zinc-200">{post.title}</span>
+                                  <span className="block text-[10px] font-mono text-zinc-400 mt-1">{post.date} · {getReadingTime(post.content)} min read</span>
+                                </button>
+                                <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                                  <button type="button" aria-label={`Edit ${post.title}`} onClick={() => { setEditingPost(post); setBlogEditorMode('write'); setBlogSaveState('idle'); }} className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white"><Pencil size={15} /></button>
+                                  <button type="button" aria-label={`Delete ${post.title}`} onClick={() => handleDeleteBlog(post.id)} className="p-1.5 text-zinc-400 hover:text-red-600"><Trash2 size={15} /></button>
+                                </div>
+                              </div>
+                            )) : (
+                              <div className="p-4 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 text-sm text-zinc-500 dark:text-zinc-400">Your published posts will appear here.</div>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => { setEditingPost({ title: '', excerpt: '', content: '', tags: [], imageUrl: '', date: new Date().toISOString().split('T')[0] }); setBlogEditorMode('write'); setBlogSaveState('idle'); }}
+                              className="w-full py-3 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-500 hover:border-zinc-900 dark:hover:border-zinc-100 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all flex items-center justify-center gap-2"
+                            >
+                              <Plus size={18} /> New post
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleResetBlogs}
+                              className="w-full py-2 text-[10px] uppercase tracking-widest text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                            >
+                              Reset to Defaults
+                            </button>
+                          </div>
+                        </aside>
 
-                          {blogEditorMode === 'write' ? (
-                            <div className="p-6 space-y-6">
-                              <div className="space-y-2">
-                                <label className="text-xs font-mono uppercase tracking-widest text-zinc-400" htmlFor="blog-title">Title</label>
-                                <input id="blog-title" type="text" placeholder="A clear, specific headline" className="w-full px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100" value={editingPost.title || ''} onChange={(e) => { setEditingPost({...editingPost, title: e.target.value}); setBlogSaveState('idle'); }} />
-                              </div>
-                              <div className="space-y-2">
-                                <label className="text-xs font-mono uppercase tracking-widest text-zinc-400" htmlFor="blog-excerpt">Excerpt</label>
-                                <textarea id="blog-excerpt" placeholder="One or two sentences that tell readers why this matters." className="w-full px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 min-h-24 resize-y" value={editingPost.excerpt || ''} onChange={(e) => setEditingPost({...editingPost, excerpt: e.target.value})} />
-                              </div>
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between gap-4">
-                                  <label className="text-xs font-mono uppercase tracking-widest text-zinc-400" htmlFor="blog-image-url">Hero image</label>
-                                  <span className="text-xs text-zinc-400">Optional · landscape works best</span>
+                        <div className="lg:col-span-8">
+                          <Card className="overflow-hidden p-0">
+                            <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-5 border-b border-zinc-200 dark:border-zinc-800">
+                              <div>
+                                <span className="text-[10px] font-mono uppercase tracking-[0.24em] text-zinc-400">{editingPost.id ? 'Editing post' : 'New post'}</span>
+                                <h3 className="text-2xl font-serif italic text-zinc-900 dark:text-white mt-1">{editingPost.title || 'Untitled dispatch'}</h3>
+                                <div className="flex items-center gap-3 text-xs font-mono text-zinc-400 mt-2">
+                                  <span>{editingPostWordCount} words</span>
+                                  <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
+                                  <span>{editingPostContent ? getReadingTime(editingPostContent) : 0} min read</span>
                                 </div>
-                                <div className="flex gap-2">
-                                  <input id="blog-image-url" type="text" placeholder="Paste an image URL" className="flex-1 px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100" value={editingPost.imageUrl || ''} onChange={(e) => setEditingPost({...editingPost, imageUrl: e.target.value})} />
-                                  <input type="file" accept="image/*" className="hidden" id="blog-image-upload" onChange={async (e) => { if (e.target.files?.[0]) { const url = await handleFileUpload(e.target.files[0]); if (url) setEditingPost({...editingPost, imageUrl: url}); } }} />
-                                  <label htmlFor="blog-image-upload" className="px-4 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-lg cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2"><ImagePlus size={16} /> Upload</label>
-                                </div>
-                                {editingPost.imageUrl && <img src={editingPost.imageUrl} alt="Blog hero preview" className="w-full h-32 object-cover rounded-lg border border-zinc-200 dark:border-zinc-800 mt-3" referrerPolicy="no-referrer" />}
                               </div>
-                              <div className="space-y-2" data-color-mode={isDarkMode ? 'dark' : 'light'}>
-                                <div className="flex items-center justify-between gap-4">
-                                  <label className="text-xs font-mono uppercase tracking-widest text-zinc-400">Content</label>
-                                  <div className="flex items-center gap-3">
-                                    <span className="hidden sm:inline text-xs text-zinc-400">Markdown supported · use headings to create rhythm</span>
-                                    {!editingPostContent.trim() && <button type="button" onClick={() => setEditingPost({...editingPost, content: BLOG_STARTER_TEMPLATE})} className="text-xs font-medium text-zinc-900 dark:text-zinc-100 hover:opacity-60 transition-opacity">Use starter outline</button>}
+                              <div className="flex rounded-lg border border-zinc-200 dark:border-zinc-800 p-1 bg-zinc-50 dark:bg-zinc-950">
+                                <button type="button" onClick={() => setBlogEditorMode('write')} className={cn("flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors", blogEditorMode === 'write' ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm" : "text-zinc-400")}><Pencil size={14} /> Write</button>
+                                <button type="button" onClick={() => setBlogEditorMode('preview')} className={cn("flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors", blogEditorMode === 'preview' ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm" : "text-zinc-400")}><Eye size={14} /> Preview</button>
+                              </div>
+                            </div>
+
+                            {blogEditorMode === 'write' ? (
+                              <div className="p-6 space-y-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                  <div className="sm:col-span-2 space-y-2">
+                                    <label className="text-xs font-mono uppercase tracking-widest text-zinc-400" htmlFor="blog-title">Title</label>
+                                    <input id="blog-title" type="text" placeholder="A clear, specific headline" className="w-full px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100" value={editingPost.title || ''} onChange={(e) => { setEditingPost({...editingPost, title: e.target.value}); setBlogSaveState('idle'); }} />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="text-xs font-mono uppercase tracking-widest text-zinc-400" htmlFor="blog-date">Publish Date</label>
+                                    <input id="blog-date" type="date" className="w-full px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100" value={editingPost.date || new Date().toISOString().split('T')[0]} onChange={(e) => setEditingPost({...editingPost, date: e.target.value})} />
                                   </div>
                                 </div>
-                                <MDEditor value={editingPostContent} onChange={(val) => { setEditingPost({...editingPost, content: val || ''}); setBlogSaveState('idle'); }} height={420} className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 focus-within:ring-2 focus-within:ring-zinc-900 dark:focus-within:ring-zinc-100" />
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
+                                <div className="space-y-2">
+                                  <label className="text-xs font-mono uppercase tracking-widest text-zinc-400" htmlFor="blog-excerpt">Excerpt (2-line card summary)</label>
+                                  <textarea id="blog-excerpt" placeholder="One or two sentences that tell readers why this matters." className="w-full px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 min-h-24 resize-y" value={editingPost.excerpt || ''} onChange={(e) => setEditingPost({...editingPost, excerpt: e.target.value})} />
+                                </div>
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between gap-4">
+                                    <label className="text-xs font-mono uppercase tracking-widest text-zinc-400" htmlFor="blog-image-url">Hero Cover Image</label>
+                                    <span className="text-xs text-zinc-400">Paste URL or upload file (auto-compressed)</span>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <input id="blog-image-url" type="text" placeholder="Paste an Unsplash/Cloudinary URL or click Upload →" className="flex-1 px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100" value={editingPost.imageUrl || ''} onChange={(e) => setEditingPost({...editingPost, imageUrl: e.target.value})} />
+                                    <input type="file" accept="image/*" className="hidden" id="blog-image-upload" onChange={async (e) => { if (e.target.files?.[0]) { const url = await handleFileUpload(e.target.files[0]); if (url) setEditingPost({...editingPost, imageUrl: url}); } }} />
+                                    <label htmlFor="blog-image-upload" className="px-4 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-lg cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2 shrink-0"><ImagePlus size={16} /> Upload</label>
+                                  </div>
+                                  {editingPost.imageUrl && <img src={editingPost.imageUrl} alt="Blog hero preview" className="w-full h-40 object-cover rounded-xl border border-zinc-200 dark:border-zinc-800 mt-3" referrerPolicy="no-referrer" />}
+                                </div>
+                                <div className="space-y-2" data-color-mode={isDarkMode ? 'dark' : 'light'}>
+                                  <div className="flex items-center justify-between gap-4">
+                                    <label className="text-xs font-mono uppercase tracking-widest text-zinc-400">Markdown Content</label>
+                                    <div className="flex items-center gap-3">
+                                      <span className="hidden sm:inline text-xs text-zinc-400">Supports ```mermaid diagrams &amp; code blocks</span>
+                                      {!editingPostContent.trim() && <button type="button" onClick={() => setEditingPost({...editingPost, content: BLOG_STARTER_TEMPLATE})} className="text-xs font-medium text-zinc-900 dark:text-zinc-100 hover:opacity-60 transition-opacity">Use starter outline</button>}
+                                    </div>
+                                  </div>
+                                  <MDEditor value={editingPostContent} onChange={(val) => { setEditingPost({...editingPost, content: val || ''}); setBlogSaveState('idle'); }} height={420} className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 focus-within:ring-2 focus-within:ring-zinc-900 dark:focus-within:ring-zinc-100" />
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-xs font-mono uppercase tracking-widest text-zinc-400" htmlFor="blog-tags">Categories / Tags</label>
+                                  <input id="blog-tags" type="text" placeholder="Data Engineering, Lakehouse, Apache Spark, AI Systems" className="w-full px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100" value={editingPostTags.join(', ')} onChange={(e) => setEditingPost({...editingPost, tags: e.target.value as any})} />
+                                  <p className="text-xs text-zinc-400">Separate tags with commas. The first tag appears as the primary card badge.</p>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
                                   {[
-                                    ['##', 'Section title'],
-                                    ['###', 'Subsection'],
-                                    ['>', 'Callout'],
-                                    ['-', 'List item']
-                                  ].map(([syntax, label]) => (
-                                    <div key={syntax} className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                                      <code className="font-mono text-zinc-900 dark:text-zinc-100">{syntax}</code>
-                                      <span>{label}</span>
+                                    ['Title', Boolean(editingPost.title?.trim())],
+                                    ['Excerpt', Boolean(editingPost.excerpt?.trim())],
+                                    ['Content', Boolean(editingPostContent.trim())],
+                                    ['Tags', editingPostTags.length > 0]
+                                  ].map(([label, complete]) => (
+                                    <div key={String(label)} className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                                      <CheckCircle2 size={14} className={complete ? 'text-emerald-600' : 'text-zinc-300 dark:text-zinc-700'} />
+                                      <span>{String(label)}</span>
                                     </div>
                                   ))}
                                 </div>
-                              </div>
-                              <div className="space-y-2">
-                                <label className="text-xs font-mono uppercase tracking-widest text-zinc-400" htmlFor="blog-tags">Tags</label>
-                                <input id="blog-tags" type="text" placeholder="data engineering, systems, career" className="w-full px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100" value={editingPostTags.join(', ')} onChange={(e) => setEditingPost({...editingPost, tags: e.target.value as any})} />
-                                <p className="text-xs text-zinc-400">Separate tags with commas. They become filters on the public blog.</p>
-                              </div>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
-                                {[
-                                  ['Title', Boolean(editingPost.title?.trim())],
-                                  ['Excerpt', Boolean(editingPost.excerpt?.trim())],
-                                  ['Content', Boolean(editingPostContent.trim())],
-                                  ['Tags', editingPostTags.length > 0]
-                                ].map(([label, complete]) => (
-                                  <div key={String(label)} className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                                    <CheckCircle2 size={14} className={complete ? 'text-emerald-600' : 'text-zinc-300 dark:text-zinc-700'} />
-                                    <span>{String(label)}</span>
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                  <div aria-live="polite" className="text-sm">
+                                    {blogSaveState === 'error' && <span className="text-red-600">Add a title and some content before saving.</span>}
+                                    {blogSaveState === 'saved' && (
+                                      <span className="text-emerald-700 dark:text-emerald-400">
+                                        Saved &amp; synced to <code className="font-mono">src/data/content.ts</code>! Commit &amp; push to Git to deploy.
+                                      </span>
+                                    )}
                                   </div>
-                                ))}
-                              </div>
-                              <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div aria-live="polite" className="text-sm">
-                                  {blogSaveState === 'error' && <span className="text-red-600">Add a title and some content before saving.</span>}
-                                  {blogSaveState === 'saved' && <span className="text-emerald-700 dark:text-emerald-400">Saved. Your post is live in the blog list.</span>}
-                                </div>
-                                <button type="button" onClick={handleSaveBlog} disabled={blogSaveState === 'saving'} className="px-5 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"><Save size={18} /> {blogSaveState === 'saving' ? 'Saving…' : editingPost.id ? 'Update post' : 'Save post'}</button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="p-6">
-                              <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-                                {editingPost.imageUrl && <img src={editingPost.imageUrl} alt="Blog hero preview" className="w-full aspect-[16/7] object-cover" referrerPolicy="no-referrer" />}
-                                <div className="p-6 sm:p-8">
-                                  <div className="flex flex-wrap gap-2 mb-4">{editingPostTags.map(tag => <span key={tag} className="px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-300">{tag}</span>)}</div>
-                                  <h1 className="text-3xl font-serif italic text-zinc-900 dark:text-white mb-3">{editingPost.title || 'Untitled dispatch'}</h1>
-                                  <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed mb-8">{editingPost.excerpt || 'Add an excerpt to give readers a clear reason to continue.'}</p>
-                                  <BlogMarkdown content={editingPostContent || '*Your article preview will appear here.*'} />
+                                  <button type="button" onClick={handleSaveBlog} disabled={blogSaveState === 'saving'} className="px-5 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"><Save size={18} /> {blogSaveState === 'saving' ? 'Saving…' : editingPost.id ? 'Update & Sync Post' : 'Publish & Sync Post'}</button>
                                 </div>
                               </div>
-                            </div>
-                          )}
-                        </Card>
+                            ) : (
+                              <div className="p-6">
+                                <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                                  {editingPost.imageUrl && <img src={editingPost.imageUrl} alt="Blog hero preview" className="w-full aspect-[16/7] object-cover" referrerPolicy="no-referrer" />}
+                                  <div className="p-6 sm:p-8">
+                                    <div className="flex flex-wrap gap-2 mb-4">{editingPostTags.map(tag => <span key={tag} className="px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-300">{tag}</span>)}</div>
+                                    <h1 className="text-3xl font-semibold text-zinc-900 dark:text-white mb-3">{editingPost.title || 'Untitled dispatch'}</h1>
+                                    <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed mb-8">{editingPost.excerpt || 'Add an excerpt to give readers a clear reason to continue.'}</p>
+                                    <BlogMarkdown content={editingPostContent || '*Your article preview will appear here.*'} />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </Card>
+                        </div>
                       </div>
                     </div>
                   ) : adminSection === 'books' ? (
@@ -2776,6 +3217,15 @@ export default function App() {
                   <Mail size={20} />
                 </a>
               </Magnetic>
+              <button
+                type="button"
+                onClick={() => { setActiveTab('admin'); setSelectedPost(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                title="Open Admin Dashboard (Cmd+.)"
+                className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors flex items-center gap-1 text-xs font-mono"
+              >
+                <Lock size={15} />
+                <span className="hidden sm:inline">Admin</span>
+              </button>
             </div>
           </div>
         </div>
