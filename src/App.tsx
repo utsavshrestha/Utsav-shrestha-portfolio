@@ -145,12 +145,17 @@ function cn(...inputs: ClassValue[]) {
 // --- Components ---
 
 const SectionHeader = ({ title, subtitle }: { title: string; subtitle?: string }) => (
-  <div className="mb-12">
-    <h2 className="text-4xl font-light tracking-tight text-zinc-900 mb-2 font-serif italic">
+  <div className="mb-14">
+    {subtitle && (
+      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/80 text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-600 dark:text-zinc-400 mb-4">
+        <span className="w-1.5 h-1.5 rounded-full bg-zinc-900 dark:bg-white" />
+        <span>{subtitle}</span>
+      </div>
+    )}
+    <h2 className="text-4xl sm:text-5xl lg:text-6xl font-serif italic font-normal tracking-[-0.025em] text-zinc-950 dark:text-white leading-[1.06]">
       {title}
     </h2>
-    {subtitle && <p className="text-zinc-500 font-mono text-sm uppercase tracking-widest">{subtitle}</p>}
-    <div className="h-px bg-zinc-200 mt-4 w-24" />
+    <div className="h-px bg-gradient-to-r from-zinc-900/30 via-zinc-300 to-transparent dark:from-white/30 dark:via-zinc-800 mt-6 w-40" />
   </div>
 );
 
@@ -1780,17 +1785,20 @@ export default function App() {
               {!selectedPost ? (
                 <div className="space-y-12 pb-16">
                   {/* Untitled UI Editorial Header & Subscribe Bar */}
-                  <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 pb-4">
-                    <div className="max-w-2xl">
-                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-4">
-                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-900 dark:bg-white" />
-                        <span>Our blog</span>
+                  <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 pb-6">
+                    <div className="max-w-3xl">
+                      <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs text-[11px] font-mono uppercase tracking-[0.22em] text-zinc-700 dark:text-zinc-300 mb-6">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>Journal &amp; Architecture Notes</span>
                       </div>
-                      <h1 className="text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-zinc-900 dark:text-white leading-[1.08]">
-                        Writings on Data, Systems &amp; AI
+                      <h1 className="text-5xl sm:text-6xl lg:text-7xl font-semibold tracking-[-0.035em] text-zinc-950 dark:text-white leading-[1.03]">
+                        Writings on{' '}
+                        <span className="font-serif italic font-normal text-zinc-700 dark:text-zinc-200">
+                          Data, Systems &amp; AI
+                        </span>
                       </h1>
-                      <p className="text-lg sm:text-xl text-zinc-500 dark:text-zinc-400 mt-4 leading-relaxed">
-                        The latest architectural deep dives, distributed systems playbooks, and engineering field notes.
+                      <p className="text-lg sm:text-xl text-zinc-500 dark:text-zinc-400 mt-5 leading-relaxed max-w-2xl font-light">
+                        The latest architectural deep dives, distributed systems playbooks, and production field notes.
                       </p>
                     </div>
 
@@ -1847,8 +1855,8 @@ export default function App() {
 
                       {/* Frosted Glass Bottom Panel */}
                       <div className="relative z-10 backdrop-blur-md bg-black/45 border-t border-white/20 p-6 sm:p-8 lg:p-10 text-white">
-                        <div className="flex items-start justify-between gap-4 mb-3">
-                          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight leading-tight max-w-3xl group-hover:underline decoration-white/60 underline-offset-4">
+                        <div className="flex items-start justify-between gap-4 mb-4">
+                          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-[-0.025em] leading-[1.08] max-w-3xl group-hover:underline decoration-white/60 underline-offset-4">
                             {featuredBlogPost.title}
                           </h2>
                           <span className="w-10 h-10 rounded-full bg-white/15 border border-white/25 flex items-center justify-center shrink-0 group-hover:bg-white group-hover:text-zinc-900 transition-all duration-300">
@@ -2016,8 +2024,8 @@ export default function App() {
                                 <span className="font-normal text-zinc-500 dark:text-zinc-400">{getReadingTime(post.content)} min read</span>
                               </div>
 
-                              <div className="flex items-start justify-between gap-3 mb-2.5">
-                                <h3 className="text-xl font-semibold text-zinc-900 dark:text-white group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors leading-snug">
+                              <div className="flex items-start justify-between gap-3 mb-3">
+                                <h3 className="text-2xl font-semibold tracking-[-0.02em] text-zinc-950 dark:text-white group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors leading-[1.22]">
                                   {post.title}
                                 </h3>
                                 <ArrowUpRight
@@ -2146,19 +2154,20 @@ export default function App() {
                   </div>
 
                   {/* Centered Editorial Article Header */}
-                  <div className="text-center max-w-3xl mx-auto mb-10">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-xs font-semibold text-zinc-800 dark:text-zinc-200 mb-5">
+                  <div className="text-center max-w-4xl mx-auto mb-12">
+                    <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-[11px] font-mono uppercase tracking-[0.18em] text-zinc-700 dark:text-zinc-300 mb-6">
+                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-900 dark:bg-white" />
                       <span>{selectedPost.tags[0] || 'Engineering'}</span>
-                      <span className="w-1 h-1 rounded-full bg-zinc-400" />
+                      <span className="text-zinc-300 dark:text-zinc-700">·</span>
                       <span>{getReadingTime(selectedPost.content)} min read</span>
                     </div>
 
-                    <h1 className="text-3xl sm:text-5xl font-semibold tracking-tight text-zinc-900 dark:text-white leading-[1.12] mb-5">
+                    <h1 className="text-4xl sm:text-6xl lg:text-[4.25rem] font-serif italic font-normal tracking-[-0.03em] text-zinc-950 dark:text-white leading-[1.05] mb-6">
                       {selectedPost.title}
                     </h1>
 
                     {selectedPost.excerpt && (
-                      <p className="text-lg sm:text-xl text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                      <p className="text-lg sm:text-xl lg:text-2xl font-light text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-3xl mx-auto">
                         {selectedPost.excerpt}
                       </p>
                     )}
