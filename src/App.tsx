@@ -313,25 +313,39 @@ const getReadingTime = (text: string) => {
 };
 
 const BLOG_STARTER_TEMPLATE = [
-  '## The idea in one line',
+  'Lead with the core problem or architectural insight in two crisp sentences so readers immediately know what they will gain.',
   '',
-  'Write the clearest version of the idea here. Give the reader a reason to keep going.',
+  '## The Architecture & Core Bottleneck',
   '',
-  '## Why this matters',
+  'Explain the system context and where conventional approaches break down at scale.',
   '',
-  'Explain the context in two or three short paragraphs. Keep each paragraph focused on one thought.',
+  '> "A great data architecture makes the right engineering pattern the easiest pattern to run."',
   '',
-  '> Add one memorable observation, rule, or quote here.',
+  '```mermaid',
+  'flowchart LR',
+  '    A[Source Events] --> B[Ingestion Layer]',
+  '    B --> C[Lakehouse Storage]',
+  '    C --> D[Serving & AI Agents]',
+  '```',
   '',
-  '## What I learned',
+  '## Implementation Playbook',
   '',
-  '- First useful lesson',
-  '- Second useful lesson',
-  '- A practical next step',
+  '### 1. Partitioning & Layout Strategy',
   '',
-  '## A practical takeaway',
+  'Break down the concrete steps, trade-offs, and metrics that made the biggest difference:',
   '',
-  'Close with the action you want the reader to remember or try.'
+  '- **First principle**: Keep file sizes aligned with downstream scan patterns.',
+  '- **Second principle**: Enforce schema contracts at the ingestion boundary.',
+  '',
+  '```sql',
+  'SELECT event_date, COUNT(*) AS total_events',
+  'FROM production.events_iceberg',
+  'GROUP BY 1 ORDER BY 1 DESC;',
+  '```',
+  '',
+  '## Production Takeaways',
+  '',
+  'Close with the measurable impact and the single rule you want readers to carry into their own systems.'
 ].join('\n');
 
 const BlogMarkdown = ({ content, className }: { content: string; className?: string }) => (
@@ -2776,13 +2790,82 @@ export default function App() {
                                 </div>
                               </div>
                             ) : (
-                              <div className="p-6">
-                                <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-                                  {editingPost.imageUrl && <img src={editingPost.imageUrl} alt="Blog hero preview" className="w-full aspect-[16/7] object-cover" referrerPolicy="no-referrer" />}
-                                  <div className="p-6 sm:p-8">
-                                    <div className="flex flex-wrap gap-2 mb-4">{editingPostTags.map(tag => <span key={tag} className="px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-300">{tag}</span>)}</div>
-                                    <h1 className="text-3xl font-semibold text-zinc-900 dark:text-white mb-3">{editingPost.title || 'Untitled dispatch'}</h1>
-                                    <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed mb-8">{editingPost.excerpt || 'Add an excerpt to give readers a clear reason to continue.'}</p>
+                              <div className="p-6 sm:p-8 space-y-10 bg-zinc-50/40 dark:bg-zinc-950/40">
+                                {/* 1. Live Untitled UI Grid Card Preview */}
+                                <div>
+                                  <div className="text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-400 mb-4">1. Blog Grid Card Preview (Untitled UI Style)</div>
+                                  <div className="max-w-sm bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xs">
+                                    <div className="aspect-[16/10] bg-zinc-100 dark:bg-zinc-800 rounded-xl mb-4 overflow-hidden relative border border-zinc-200/70 dark:border-zinc-800">
+                                      <img
+                                        src={editingPost.imageUrl || `https://picsum.photos/seed/${editingPost.title || 'preview'}/800/500`}
+                                        alt={editingPost.title || 'Preview'}
+                                        className="object-cover w-full h-full"
+                                        referrerPolicy="no-referrer"
+                                      />
+                                      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent opacity-90" />
+                                      <div className="absolute inset-x-0 bottom-0 backdrop-blur-md bg-black/40 border-t border-white/20 px-3.5 py-2.5 text-white flex items-center justify-between gap-2">
+                                        <div className="min-w-0">
+                                          <p className="text-xs font-semibold truncate">{PERSONAL_INFO.name}</p>
+                                          <p className="text-[11px] text-white/75">{formatBlogDate(editingPost.date || new Date().toISOString().split('T')[0])}</p>
+                                        </div>
+                                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium border border-white/35 bg-white/10 text-white shrink-0">
+                                          {editingPostTags[0] || 'Engineering'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">
+                                      <span>{editingPostTags[0] || 'Engineering'}</span>
+                                      <span className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                                      <span className="font-normal text-zinc-500 dark:text-zinc-400">{getReadingTime(editingPostContent)} min read</span>
+                                    </div>
+                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                      <h4 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950 dark:text-white leading-snug">
+                                        {editingPost.title || 'Untitled dispatch'}
+                                      </h4>
+                                      <ArrowUpRight size={18} className="shrink-0 mt-1 text-zinc-900 dark:text-white" />
+                                    </div>
+                                    <p className="text-zinc-500 dark:text-zinc-400 text-xs leading-relaxed line-clamp-2">
+                                      {editingPost.excerpt || 'Add an excerpt to give readers a clear reason to continue.'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* 2. Live Full Editorial Article Reader Preview */}
+                                <div>
+                                  <div className="text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-400 mb-4">2. Full Article Reader View Preview</div>
+                                  <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 sm:p-10 shadow-xs">
+                                    <div className="text-center max-w-3xl mx-auto mb-8">
+                                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-[11px] font-mono uppercase tracking-[0.18em] text-zinc-700 dark:text-zinc-300 mb-5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-900 dark:bg-white" />
+                                        <span>{editingPostTags[0] || 'Engineering'}</span>
+                                        <span className="text-zinc-300 dark:text-zinc-700">·</span>
+                                        <span>{getReadingTime(editingPostContent)} min read</span>
+                                      </div>
+                                      <h1 className="text-3xl sm:text-5xl font-serif italic font-normal tracking-[-0.03em] text-zinc-950 dark:text-white leading-[1.06] mb-4">
+                                        {editingPost.title || 'Untitled dispatch'}
+                                      </h1>
+                                      <p className="text-base sm:text-lg font-light text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                                        {editingPost.excerpt || 'Add an excerpt to give readers a clear reason to continue.'}
+                                      </p>
+                                    </div>
+                                    {editingPost.imageUrl && (
+                                      <div className="aspect-[16/9] rounded-2xl overflow-hidden mb-10 border border-zinc-200 dark:border-zinc-800">
+                                        <img src={editingPost.imageUrl} alt="Blog hero preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                      </div>
+                                    )}
+                                    {extractHeadings(editingPostContent).length > 0 && (
+                                      <div className="mb-8 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                                        <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-zinc-400 mb-2">
+                                          <BookOpen size={13} />
+                                          <span>Auto-Generated Table of Contents ({extractHeadings(editingPostContent).length} sections)</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-zinc-600 dark:text-zinc-400">
+                                          {extractHeadings(editingPostContent).map((h, i) => (
+                                            <span key={i}><strong className="font-mono text-zinc-400 mr-1">{String(i + 1).padStart(2, '0')}</strong>{h}</span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
                                     <BlogMarkdown content={editingPostContent || '*Your article preview will appear here.*'} />
                                   </div>
                                 </div>
