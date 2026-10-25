@@ -348,24 +348,74 @@ const BLOG_STARTER_TEMPLATE = [
   'Close with the measurable impact and the single rule you want readers to carry into their own systems.'
 ].join('\n');
 
+const slugifyHeading = (text: string) =>
+  text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+const CopyCodeButton = ({ code }: { code: string }) => {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        navigator.clipboard.writeText(code);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-zinc-200/70 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 transition-colors cursor-pointer"
+    >
+      {copied ? (
+        <>
+          <Check size={12} className="text-emerald-600 dark:text-emerald-400" />
+          <span className="text-emerald-700 dark:text-emerald-400 font-semibold">Copied ✓</span>
+        </>
+      ) : (
+        <>
+          <Copy size={12} />
+          <span>Copy code</span>
+        </>
+      )}
+    </button>
+  );
+};
+
 const BlogMarkdown = ({ content, className }: { content: string; className?: string }) => (
   <div className={cn('blog-prose', className)}>
     <ReactMarkdown
       components={{
-        h1: ({ children, ...props }: any) => <h1 {...props}>{children}</h1>,
-        h2: ({ children, ...props }: any) => <h2 {...props}>{children}</h2>,
-        h3: ({ children, ...props }: any) => <h3 {...props}>{children}</h3>,
+        h1: ({ children, ...props }: any) => <h1 className="scroll-mt-28" {...props}>{children}</h1>,
+        h2: ({ children, ...props }: any) => {
+          const rawText = Array.isArray(children) ? children.join('') : String(children || '');
+          const id = `section-${slugifyHeading(rawText)}`;
+          return (
+            <h2 id={id} className="scroll-mt-28 group/heading relative" {...props}>
+              {children}
+            </h2>
+          );
+        },
+        h3: ({ children, ...props }: any) => {
+          const rawText = Array.isArray(children) ? children.join('') : String(children || '');
+          const id = `section-${slugifyHeading(rawText)}`;
+          return <h3 id={id} className="scroll-mt-28" {...props}>{children}</h3>;
+        },
         a: ({ children, href, ...props }: any) => (
           <a href={href} {...props} target={href?.startsWith('/') ? undefined : '_blank'} rel={href?.startsWith('/') ? undefined : 'noreferrer'}>{children}</a>
         ),
         img: ({ alt, ...props }: any) => <img {...props} alt={alt || ''} loading="lazy" />,
         code({ inline, className: codeClassName, children, ...props }: any) {
           const match = /language-(\w+)/.exec(codeClassName || '');
+          const rawCode = String(children).replace(/\n$/, '');
           return !inline && match && match[1] === 'mermaid' ? (
-            <Mermaid chart={String(children).replace(/\n$/, '')} />
+            <Mermaid chart={rawCode} />
           ) : !inline && match ? (
             <div className="blog-code-block">
-              <div className="blog-code-label"><span>{match[1]}</span><span>Copy into your notes</span></div>
+              <div className="blog-code-label">
+                <span>{match[1]}</span>
+                <CopyCodeButton code={rawCode} />
+              </div>
               <pre><code className={codeClassName} {...props}>{children}</code></pre>
             </div>
           ) : (
@@ -578,6 +628,9 @@ export default function App() {
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [activeHeadingSlug, setActiveHeadingSlug] = useState<string>('');
+  const [readingProgress, setReadingProgress] = useState<number>(0);
+  const [urlInitialized, setUrlInitialized] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
   const [projectCategory, setProjectCategory] = useState('All');
   const [adminSection, setAdminSection] = useState<'blogs' | 'books' | 'games' | 'projects' | 'resume'>('blogs');
@@ -598,6 +651,95 @@ export default function App() {
       .filter(line => /^##\s+/.test(line.trim()))
       .map(line => line.trim().replace(/^##\s+/, '').trim());
   };
+
+  // Feature #3: Deep-link URL Hydration (?tab=blog&post=slug or ?tab=projects&project=id)
+  useEffect(() => {
+    const applyUrlParams = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab') as typeof activeTab | null;
+      const postParam = params.get('post');
+      const projectParam = params.get('project');
+
+      const validTabs = ['home', 'experience', 'projects', 'skills', 'blog', 'life', 'contact', 'admin'];
+      if (postParam) {
+        const matchedPost = blogs.find(b => b.id === postParam);
+        if (matchedPost) {
+          setActiveTab('blog');
+          setSelectedPost(matchedPost);
+        }
+      } else if (projectParam) {
+        const matchedProj = projects.find(
+          p => (p.id || p.title.toLowerCase().replace(/\s+/g, '-')) === projectParam
+        );
+        if (matchedProj) {
+          setActiveTab('projects');
+          setSelectedProject(matchedProj);
+        }
+      } else if (tabParam && validTabs.includes(tabParam)) {
+        setActiveTab(tabParam);
+        setSelectedPost(null);
+      }
+      setUrlInitialized(true);
+    };
+
+    applyUrlParams();
+    window.addEventListener('popstate', applyUrlParams);
+    return () => window.removeEventListener('popstate', applyUrlParams);
+  }, [blogs, projects]);
+
+  // Sync activeTab, selectedPost, and selectedProject back to the browser URL
+  useEffect(() => {
+    if (!urlInitialized) return;
+    const params = new URLSearchParams();
+    if (activeTab === 'blog' && selectedPost) {
+      params.set('tab', 'blog');
+      params.set('post', selectedPost.id);
+    } else if (selectedProject) {
+      params.set('tab', activeTab === 'home' ? 'projects' : activeTab);
+      params.set('project', selectedProject.id || selectedProject.title.toLowerCase().replace(/\s+/g, '-'));
+    } else if (activeTab !== 'home') {
+      params.set('tab', activeTab);
+    }
+    const queryString = params.toString();
+    const nextUrl = queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname;
+    if (nextUrl !== `${window.location.pathname}${window.location.search}`) {
+      window.history.replaceState(null, '', nextUrl);
+    }
+  }, [activeTab, selectedPost, selectedProject, urlInitialized]);
+
+  // Feature #5: Track active TOC heading & reading progress when reading a blog post
+  useEffect(() => {
+    if (!selectedPost) {
+      setReadingProgress(0);
+      setActiveHeadingSlug('');
+      return;
+    }
+    const headings = extractHeadings(selectedPost.content).map(h => `section-${slugifyHeading(h)}`);
+    if (headings.length > 0) setActiveHeadingSlug(headings[0]);
+
+    const handleScroll = () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const pct = docHeight > 0 ? Math.min(100, Math.max(0, Math.round((scrollTop / docHeight) * 100))) : 0;
+      setReadingProgress(pct);
+
+      let current = headings[0] || '';
+      for (const id of headings) {
+        const el = document.getElementById(id);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          if (rect.top <= 160) {
+            current = id;
+          }
+        }
+      }
+      if (current) setActiveHeadingSlug(current);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [selectedPost]);
 
   const blogCategories = ['All', ...Array.from(new Set(blogs.flatMap(p => p.tags)))];
   const filteredBlogs = blogs
@@ -1192,11 +1334,51 @@ export default function App() {
           blogs={blogs} 
         />
         <Helmet>
-          <title>Utsav Shrestha | Data Engineer</title>
-          <meta name="description" content="Portfolio of Utsav Shrestha, a Data Engineer specializing in Big Data, Spark, and Data Architecture." />
-          <meta property="og:title" content="Utsav Shrestha | Data Engineer" />
-          <meta property="og:description" content="Portfolio of Utsav Shrestha, a Data Engineer specializing in Big Data, Spark, and Data Architecture." />
-          <meta property="og:type" content="website" />
+          <title>
+            {selectedPost
+              ? `${selectedPost.title} — Utsav Shrestha`
+              : selectedProject
+                ? `${selectedProject.title} — Case Study | Utsav Shrestha`
+                : activeTab === 'blog'
+                  ? 'Writings on Data, Systems & AI | Utsav Shrestha'
+                  : 'Utsav Shrestha | Data Engineer & Systems Architect'}
+          </title>
+          <meta
+            name="description"
+            content={
+              selectedPost
+                ? selectedPost.excerpt
+                : selectedProject
+                  ? selectedProject.description
+                  : 'Portfolio of Utsav Shrestha, a Data Engineer specializing in Apache Spark, Lakehouse Architecture, and Production AI Systems.'
+            }
+          />
+          <meta
+            property="og:title"
+            content={
+              selectedPost
+                ? `${selectedPost.title} — Utsav Shrestha`
+                : selectedProject
+                  ? `${selectedProject.title} — Case Study | Utsav Shrestha`
+                  : 'Utsav Shrestha | Data Engineer & Systems Architect'
+            }
+          />
+          <meta
+            property="og:description"
+            content={
+              selectedPost
+                ? selectedPost.excerpt
+                : selectedProject
+                  ? selectedProject.description
+                  : 'Portfolio of Utsav Shrestha, a Data Engineer specializing in Apache Spark, Lakehouse Architecture, and Production AI Systems.'
+            }
+          />
+          <meta property="og:type" content={selectedPost ? 'article' : 'website'} />
+          <meta
+            property="og:image"
+            content={selectedPost?.imageUrl || PERSONAL_INFO.image}
+          />
+          <meta name="twitter:card" content="summary_large_image" />
         </Helmet>
         {/* Navigation */}
         <nav className="sticky top-0 z-50 bg-[#F9F9F8]/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
@@ -2141,7 +2323,7 @@ export default function App() {
               ) : (
                 /* Single Post Reading View — Untitled UI Editorial Layout */
                 <div className="max-w-5xl mx-auto pb-24">
-                  <div className="flex items-center justify-between gap-4 mb-10">
+                  <div className="flex flex-wrap items-center justify-between gap-4 mb-10">
                     <button
                       onClick={() => setSelectedPost(null)}
                       aria-label="Back to all blog posts"
@@ -2151,18 +2333,30 @@ export default function App() {
                       <span>Back to blog</span>
                     </button>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-zinc-100/80 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs font-mono text-zinc-600 dark:text-zinc-400">
+                        <span>Reading progress</span>
+                        <div className="w-16 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                          <div
+                            className="h-full bg-zinc-900 dark:bg-white transition-all duration-150"
+                            style={{ width: `${readingProgress}%` }}
+                          />
+                        </div>
+                        <span className="w-8 text-right text-zinc-900 dark:text-white font-semibold">{readingProgress}%</span>
+                      </div>
+
                       <button
                         type="button"
                         onClick={() => {
-                          navigator.clipboard.writeText(window.location.href);
+                          const shareUrl = `${window.location.origin}${window.location.pathname}?tab=blog&post=${encodeURIComponent(selectedPost.id)}`;
+                          navigator.clipboard.writeText(shareUrl);
                           setCopiedLink(true);
                           setTimeout(() => setCopiedLink(false), 2000);
                         }}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
                       >
-                        {copiedLink ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                        <span>{copiedLink ? 'Link copied' : 'Copy link'}</span>
+                        {copiedLink ? <Check size={14} className="text-emerald-600" /> : <Share2 size={14} />}
+                        <span>{copiedLink ? 'Article link copied ✓' : 'Share article link'}</span>
                       </button>
                     </div>
                   </div>
@@ -2242,18 +2436,50 @@ export default function App() {
                       </div>
 
                       {extractHeadings(selectedPost.content).length > 0 && (
-                        <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-                          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-zinc-400 mb-3">
-                            <BookOpen size={14} />
-                            <span>In this article</span>
+                        <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-4">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-zinc-400">
+                              <BookOpen size={14} />
+                              <span>In this article</span>
+                            </div>
+                            <span className="text-[11px] font-mono text-zinc-400">{readingProgress}% read</span>
                           </div>
-                          <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
-                            {extractHeadings(selectedPost.content).map((heading, idx) => (
-                              <li key={idx} className="flex items-start gap-2 leading-snug">
-                                <span className="text-xs font-mono text-zinc-400 mt-0.5">{String(idx + 1).padStart(2, '0')}</span>
-                                <span>{heading}</span>
-                              </li>
-                            ))}
+                          <div className="w-full h-1 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                            <div
+                              className="h-full bg-zinc-900 dark:bg-white transition-all duration-150"
+                              style={{ width: `${readingProgress}%` }}
+                            />
+                          </div>
+                          <ul className="space-y-1.5 text-sm">
+                            {extractHeadings(selectedPost.content).map((heading, idx) => {
+                              const slug = `section-${slugifyHeading(heading)}`;
+                              const isActive = activeHeadingSlug === slug;
+                              return (
+                                <li key={idx}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const el = document.getElementById(slug);
+                                      if (el) {
+                                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                        setActiveHeadingSlug(slug);
+                                      }
+                                    }}
+                                    className={cn(
+                                      'w-full text-left flex items-start gap-2.5 px-2.5 py-1.5 rounded-lg leading-snug transition-all cursor-pointer',
+                                      isActive
+                                        ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-950 dark:text-white font-semibold'
+                                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                                    )}
+                                  >
+                                    <span className={cn('text-xs font-mono mt-0.5 shrink-0', isActive ? 'text-zinc-900 dark:text-white' : 'text-zinc-400')}>
+                                      {String(idx + 1).padStart(2, '0')}
+                                    </span>
+                                    <span>{heading}</span>
+                                  </button>
+                                </li>
+                              );
+                            })}
                           </ul>
                         </div>
                       )}
