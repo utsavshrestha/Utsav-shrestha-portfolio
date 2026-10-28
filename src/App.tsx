@@ -609,9 +609,41 @@ export default function App() {
   const heroImageScale = useTransform(scrollYProgress, [0, 0.32], [1, 1.22]);
   const heroImageY = useTransform(scrollYProgress, [0, 0.32], [0, -20]);
 
-  const [activeTab, setActiveTab] = useState<'home' | 'experience' | 'projects' | 'skills' | 'blog' | 'life' | 'contact' | 'admin'>('home');
-  const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
-  const [selectedProject, setSelectedProject] = useState<any | null>(null);
+  const VALID_TABS = ['home', 'experience', 'projects', 'skills', 'blog', 'life', 'contact', 'admin'] as const;
+
+  const parseUrlTarget = () => {
+    const params = new URLSearchParams(window.location.search);
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    const postFromPath = pathParts[0] === 'blog' && pathParts[1] ? decodeURIComponent(pathParts[1]) : null;
+    const projFromPath = pathParts[0] === 'projects' && pathParts[1] ? decodeURIComponent(pathParts[1]) : null;
+    const tabFromPath = pathParts[0] && VALID_TABS.includes(pathParts[0] as any) ? (pathParts[0] as any) : null;
+    const hashTab = window.location.hash.replace('#', '') as any;
+
+    const postSlug = params.get('post') || postFromPath;
+    const projSlug = params.get('project') || projFromPath;
+    const tabParam = (params.get('tab') as any) || tabFromPath || (VALID_TABS.includes(hashTab) ? hashTab : null);
+
+    const tab: typeof VALID_TABS[number] = postSlug
+      ? 'blog'
+      : projSlug
+        ? 'projects'
+        : tabParam && VALID_TABS.includes(tabParam)
+          ? tabParam
+          : 'home';
+
+    return { tab, postSlug, projSlug };
+  };
+
+  const [activeTab, setActiveTab] = useState<'home' | 'experience' | 'projects' | 'skills' | 'blog' | 'life' | 'contact' | 'admin'>(() => parseUrlTarget().tab);
+  const [selectedPost, setSelectedPost] = useState<BlogPost | null>(() => {
+    const { postSlug } = parseUrlTarget();
+    return postSlug ? INITIAL_BLOG_POSTS.find(b => b.id === postSlug) || null : null;
+  });
+  const [selectedProject, setSelectedProject] = useState<any | null>(() => {
+    const { projSlug } = parseUrlTarget();
+    return projSlug ? PROJECTS.find((p: any) => (p.id || p.title.toLowerCase().replace(/\s+/g, '-')) === projSlug) || null : null;
+  });
+  const [pendingPostSlug, setPendingPostSlug] = useState<string | null>(() => parseUrlTarget().postSlug);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [blogs, setBlogs] = useState<BlogPost[]>(INITIAL_BLOG_POSTS);
   const [adminPassword, setAdminPassword] = useState('');
@@ -652,44 +684,48 @@ export default function App() {
       .map(line => line.trim().replace(/^##\s+/, '').trim());
   };
 
-  // Feature #3: Deep-link URL Hydration (?tab=blog&post=slug or ?tab=projects&project=id)
+  // Feature #3: Resolve deep-linked post once blogs array updates from /api/blogs
   useEffect(() => {
-    const applyUrlParams = () => {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get('tab') as typeof activeTab | null;
-      const postParam = params.get('post');
-      const projectParam = params.get('project');
+    if (!pendingPostSlug) return;
+    const matchedPost = blogs.find(b => b.id === pendingPostSlug);
+    if (matchedPost) {
+      setActiveTab('blog');
+      setSelectedPost(matchedPost);
+      setPendingPostSlug(null);
+    }
+  }, [blogs, pendingPostSlug]);
 
-      const validTabs = ['home', 'experience', 'projects', 'skills', 'blog', 'life', 'contact', 'admin'];
-      if (postParam) {
-        const matchedPost = blogs.find(b => b.id === postParam);
-        if (matchedPost) {
-          setActiveTab('blog');
-          setSelectedPost(matchedPost);
-        }
-      } else if (projectParam) {
-        const matchedProj = projects.find(
-          p => (p.id || p.title.toLowerCase().replace(/\s+/g, '-')) === projectParam
-        );
-        if (matchedProj) {
-          setActiveTab('projects');
-          setSelectedProject(matchedProj);
-        }
-      } else if (tabParam && validTabs.includes(tabParam)) {
-        setActiveTab(tabParam);
+  // Support browser Back / Forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const { tab, postSlug, projSlug } = parseUrlTarget();
+      setActiveTab(tab);
+      if (postSlug) {
+        const matchedPost = blogs.find(b => b.id === postSlug);
+        if (matchedPost) setSelectedPost(matchedPost);
+        else setPendingPostSlug(postSlug);
+      } else {
         setSelectedPost(null);
       }
-      setUrlInitialized(true);
+      if (projSlug) {
+        const matchedProj = projects.find(
+          p => (p.id || p.title.toLowerCase().replace(/\s+/g, '-')) === projSlug
+        );
+        setSelectedProject(matchedProj || null);
+      } else {
+        setSelectedProject(null);
+      }
     };
 
-    applyUrlParams();
-    window.addEventListener('popstate', applyUrlParams);
-    return () => window.removeEventListener('popstate', applyUrlParams);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, [blogs, projects]);
 
   // Sync activeTab, selectedPost, and selectedProject back to the browser URL
   useEffect(() => {
-    if (!urlInitialized) return;
+    // Wait until any async database blog post finishes resolving before updating URL
+    if (pendingPostSlug && !selectedPost) return;
+
     const params = new URLSearchParams();
     if (activeTab === 'blog' && selectedPost) {
       params.set('tab', 'blog');
@@ -701,11 +737,11 @@ export default function App() {
       params.set('tab', activeTab);
     }
     const queryString = params.toString();
-    const nextUrl = queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname;
+    const nextUrl = queryString ? `/?${queryString}` : '/';
     if (nextUrl !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(null, '', nextUrl);
     }
-  }, [activeTab, selectedPost, selectedProject, urlInitialized]);
+  }, [activeTab, selectedPost, selectedProject, pendingPostSlug]);
 
   // Feature #5: Track active TOC heading & reading progress when reading a blog post
   useEffect(() => {
@@ -1296,6 +1332,7 @@ export default function App() {
   const NavItem = ({ id, label }: { id: typeof activeTab; label: string }) => (
     <button
       onClick={() => {
+        setPendingPostSlug(null);
         setActiveTab(id);
         setSelectedPost(null);
         setIsMenuOpen(false);
@@ -2325,7 +2362,7 @@ export default function App() {
                 <div className="max-w-5xl mx-auto pb-24">
                   <div className="flex flex-wrap items-center justify-between gap-4 mb-10">
                     <button
-                      onClick={() => setSelectedPost(null)}
+                      onClick={() => { setPendingPostSlug(null); setSelectedPost(null); }}
                       aria-label="Back to all blog posts"
                       className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
                     >
