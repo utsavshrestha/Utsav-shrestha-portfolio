@@ -614,14 +614,21 @@ export default function App() {
   const parseUrlTarget = () => {
     const params = new URLSearchParams(window.location.search);
     const pathParts = window.location.pathname.split('/').filter(Boolean);
-    const postFromPath = pathParts[0] === 'blog' && pathParts[1] ? decodeURIComponent(pathParts[1]) : null;
-    const projFromPath = pathParts[0] === 'projects' && pathParts[1] ? decodeURIComponent(pathParts[1]) : null;
-    const tabFromPath = pathParts[0] && VALID_TABS.includes(pathParts[0] as any) ? (pathParts[0] as any) : null;
-    const hashTab = window.location.hash.replace('#', '') as any;
+    const rawHash = window.location.hash.replace(/^#\/?/, '');
+    const [hashPathPart, hashQueryPart] = rawHash.split('?');
+    const [hashBase, hashSub] = (hashPathPart || '').split('/');
+    const hashParams = hashQueryPart ? new URLSearchParams(hashQueryPart) : null;
 
-    const postSlug = params.get('post') || postFromPath;
-    const projSlug = params.get('project') || projFromPath;
-    const tabParam = (params.get('tab') as any) || tabFromPath || (VALID_TABS.includes(hashTab) ? hashTab : null);
+    const postFromPath = pathParts[0] === 'blog' && pathParts[1] ? decodeURIComponent(pathParts[1]) : null;
+    const postFromHash = hashBase === 'blog' && hashSub ? decodeURIComponent(hashSub) : hashParams?.get('post') || null;
+    const projFromPath = pathParts[0] === 'projects' && pathParts[1] ? decodeURIComponent(pathParts[1]) : null;
+    const projFromHash = hashBase === 'projects' && hashSub ? decodeURIComponent(hashSub) : hashParams?.get('project') || null;
+    const tabFromPath = pathParts[0] && VALID_TABS.includes(pathParts[0] as any) ? (pathParts[0] as any) : null;
+    const tabFromHash = VALID_TABS.includes(hashBase as any) ? (hashBase as any) : (hashParams?.get('tab') as any) || null;
+
+    const postSlug = params.get('post') || postFromPath || postFromHash;
+    const projSlug = params.get('project') || projFromPath || projFromHash;
+    const tabParam = (params.get('tab') as any) || tabFromPath || tabFromHash;
 
     const tab: typeof VALID_TABS[number] = postSlug
       ? 'blog'
@@ -634,11 +641,20 @@ export default function App() {
     return { tab, postSlug, projSlug };
   };
 
+  const findMatchingBlog = (list: BlogPost[], slug: string | null) => {
+    if (!slug) return null;
+    const normalized = decodeURIComponent(slug).trim().toLowerCase();
+    return (
+      list.find(
+        b =>
+          String(b.id).trim().toLowerCase() === normalized ||
+          b.title.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') === normalized
+      ) || null
+    );
+  };
+
   const [activeTab, setActiveTab] = useState<'home' | 'experience' | 'projects' | 'skills' | 'blog' | 'life' | 'contact' | 'admin'>(() => parseUrlTarget().tab);
-  const [selectedPost, setSelectedPost] = useState<BlogPost | null>(() => {
-    const { postSlug } = parseUrlTarget();
-    return postSlug ? INITIAL_BLOG_POSTS.find(b => b.id === postSlug) || null : null;
-  });
+  const [selectedPost, setSelectedPost] = useState<BlogPost | null>(() => findMatchingBlog(INITIAL_BLOG_POSTS, parseUrlTarget().postSlug));
   const [selectedProject, setSelectedProject] = useState<any | null>(() => {
     const { projSlug } = parseUrlTarget();
     return projSlug ? PROJECTS.find((p: any) => (p.id || p.title.toLowerCase().replace(/\s+/g, '-')) === projSlug) || null : null;
@@ -687,7 +703,7 @@ export default function App() {
   // Feature #3: Resolve deep-linked post once blogs array updates from /api/blogs
   useEffect(() => {
     if (!pendingPostSlug) return;
-    const matchedPost = blogs.find(b => b.id === pendingPostSlug);
+    const matchedPost = findMatchingBlog(blogs, pendingPostSlug);
     if (matchedPost) {
       setActiveTab('blog');
       setSelectedPost(matchedPost);
@@ -695,13 +711,13 @@ export default function App() {
     }
   }, [blogs, pendingPostSlug]);
 
-  // Support browser Back / Forward navigation
+  // Support browser Back / Forward and Hash navigation
   useEffect(() => {
     const handlePopState = () => {
       const { tab, postSlug, projSlug } = parseUrlTarget();
       setActiveTab(tab);
       if (postSlug) {
-        const matchedPost = blogs.find(b => b.id === postSlug);
+        const matchedPost = findMatchingBlog(blogs, postSlug);
         if (matchedPost) setSelectedPost(matchedPost);
         else setPendingPostSlug(postSlug);
       } else {
@@ -709,7 +725,7 @@ export default function App() {
       }
       if (projSlug) {
         const matchedProj = projects.find(
-          p => (p.id || p.title.toLowerCase().replace(/\s+/g, '-')) === projSlug
+          (p: any) => (p.id || p.title.toLowerCase().replace(/\s+/g, '-')) === projSlug
         );
         setSelectedProject(matchedProj || null);
       } else {
@@ -718,7 +734,11 @@ export default function App() {
     };
 
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
+    };
   }, [blogs, projects]);
 
   // Sync activeTab, selectedPost, and selectedProject back to the browser URL
